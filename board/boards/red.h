@@ -155,6 +155,9 @@ static void red_init(void) {
 
   // Set normal CAN mode
   red_set_can_mode(CAN_MODE_NORMAL);
+
+  // SPI init
+  gpio_spi_init();
 }
 
 static harness_configuration red_harness_config = {
@@ -175,7 +178,7 @@ board board_red = {
   .set_bootkick = unused_set_bootkick,
   .harness_config = &red_harness_config,
   .has_obd = true,
-  .has_spi = false,
+  .has_spi = true,
   .has_canfd = true,
   .fan_max_rpm = 0U,
   .fan_max_pwm = 100U,

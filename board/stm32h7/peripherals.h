@@ -10,10 +10,10 @@ static void gpio_usb_init(void) {
 }
 
 void gpio_spi_init(void) {
-  set_gpio_alternate(GPIOE, 11, GPIO_AF5_SPI4);
-  set_gpio_alternate(GPIOE, 12, GPIO_AF5_SPI4);
-  set_gpio_alternate(GPIOE, 13, GPIO_AF5_SPI4);
-  set_gpio_alternate(GPIOE, 14, GPIO_AF5_SPI4);
+  set_gpio_alternate(GPIOA, 4, GPIO_AF5_SPI1);
+  set_gpio_alternate(GPIOA, 5, GPIO_AF5_SPI1);
+  set_gpio_alternate(GPIOA, 6, GPIO_AF5_SPI1);
+  set_gpio_alternate(GPIOA, 7, GPIO_AF5_SPI1);
   register_set_bits(&(GPIOE->OSPEEDR), GPIO_OSPEEDR_OSPEED11 | GPIO_OSPEEDR_OSPEED12 | GPIO_OSPEEDR_OSPEED13 | GPIO_OSPEEDR_OSPEED14);
 }
 
