@@ -86,12 +86,12 @@ void llspi_init(void) {
   REGISTER_INTERRUPT(DMA2_Stream3_IRQn, DMA2_Stream3_IRQ_Handler, SPI_IRQ_RATE, FAULT_INTERRUPT_RATE_SPI_DMA)
 
   // Setup MOSI DMA
-  register_set(&(DMAMUX1_Channel10->CCR), 83U, 0xFFFFFFFFU);
+  register_set(&(DMAMUX1_Channel10->CCR), 37U, 0xFFFFFFFFU);
   register_set(&(DMA2_Stream2->CR), (DMA_SxCR_MINC | DMA_SxCR_TCIE), 0x1E077EFEU);
   register_set(&(DMA2_Stream2->PAR), (uint32_t)&(SPI1->RXDR), 0xFFFFFFFFU);
 
   // Setup MISO DMA, memory -> peripheral
-  register_set(&(DMAMUX1_Channel11->CCR), 84U, 0xFFFFFFFFU);
+  register_set(&(DMAMUX1_Channel11->CCR), 38U, 0xFFFFFFFFU);
   register_set(&(DMA2_Stream3->CR), (DMA_SxCR_MINC | DMA_SxCR_DIR_0 | DMA_SxCR_TCIE), 0x1E077EFEU);
   register_set(&(DMA2_Stream3->PAR), (uint32_t)&(SPI1->TXDR), 0xFFFFFFFFU);
 
