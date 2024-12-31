@@ -53,7 +53,8 @@ void comms_endpoint2_write(const uint8_t *data, uint32_t len) {
   if ((len != 0U) && (ur != NULL)) {
     if ((data[0] < 2U) || (data[0] >= 4U)) {
       for (uint32_t i = 1; i < len; i++) {
-        while (!put_char(ur, data[i])) {
+        // while (!put_char(ur, data[i])) {
+        while (!injectc(ur, data[i])) {
           // wait
         }
       }
