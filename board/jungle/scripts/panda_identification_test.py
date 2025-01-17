@@ -4,7 +4,7 @@ import time
 import random
 import contextlib
 
-from panda import PandaJungle
+from pandajungle import PandaJungle
 from panda import Panda
 
 PANDA_UNDER_TEST = Panda.HW_TYPE_UNO

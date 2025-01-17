@@ -39,8 +39,12 @@ setup(
   author_email='',
   packages=[
     'panda',
+    'pandajungle'
   ],
-  package_dir={'panda': 'python'},
+  package_dir={
+    'panda': 'python',
+    'pandajungle': 'board/jungle',
+  },
   platforms='any',
   license='MIT',
   install_requires=[
