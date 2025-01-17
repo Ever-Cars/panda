@@ -2,7 +2,7 @@
 import time
 from pprint import pprint
 
-from panda import PandaJungle
+from pandajungle import PandaJungle
 
 if __name__ == "__main__":
   i = 0

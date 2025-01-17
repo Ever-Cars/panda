@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import time
 import re
-from panda import PandaJungle
+from pandajungle import PandaJungle
 
 RED = '\033[91m'
 GREEN = '\033[92m'

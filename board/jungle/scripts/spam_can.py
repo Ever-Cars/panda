@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import os
 import random
-from panda import PandaJungle
+from pandajungle import PandaJungle
 
 def get_test_string():
   return b"test" + os.urandom(10)

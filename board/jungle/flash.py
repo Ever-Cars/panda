@@ -3,7 +3,7 @@ import os
 import subprocess
 import argparse
 
-from panda import PandaJungle
+from pandajungle import PandaJungle
 
 board_path = os.path.dirname(os.path.realpath(__file__))
 
