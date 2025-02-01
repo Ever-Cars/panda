@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import os
 import random
+import time
 from pandajungle import PandaJungle
 
 def get_test_string():
@@ -17,4 +18,5 @@ if __name__ == "__main__":
     st = get_test_string()[0:8]
     bus = random.randint(0, 2)
     p.can_send(at, st, bus)
+    time.sleep(0.4)
     # print("Sent message on bus: ", bus)

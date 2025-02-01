@@ -312,7 +312,7 @@ int main(void) {
   adc_init();
 
   // print hello
-  print("\n\n\n************************ MAIN START ************************\n");
+  print("\n\n\n************************ MAIN START ("FW_VERSION") ************************\n");
 
   // check for non-supported board types
   assert_fatal(hw_type != HW_TYPE_UNKNOWN, "Unsupported board type");

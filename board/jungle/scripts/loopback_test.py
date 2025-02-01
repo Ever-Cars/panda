@@ -18,13 +18,14 @@ BUS_SPEEDS = [125, 500, 1000]
 #################################################################
 # To suppress the connection text
 def silent_panda_connect(serial):
-  with open(os.devnull, "w") as devnull:
-    with contextlib.redirect_stdout(devnull):
-      panda = Panda(serial)
+  # with open(os.devnull, "w") as devnull:
+  #   with contextlib.redirect_stdout(devnull):
+  panda = Panda(serial)
   return panda
 
 def print_colored(text, color):
-  cprint(text + " "*40, color, end="\r")
+  print(text)
+  # cprint(text + " "*40, color, end="\r")
 
 def connect_to_pandas():
   print_colored("Connecting to pandas", "blue")
@@ -113,9 +114,9 @@ counter = 0
 if __name__ == "__main__":
   # Connect to jungle silently
   print_colored("Connecting to jungle", "blue")
-  with open(os.devnull, "w") as devnull:
-    with contextlib.redirect_stdout(devnull):
-      jungle = PandaJungle()
+  # with open(os.devnull, "w") as devnull:
+  #   with contextlib.redirect_stdout(devnull):
+  jungle = PandaJungle()
   jungle.set_panda_power(True)
   jungle.set_ignition(False)
 
