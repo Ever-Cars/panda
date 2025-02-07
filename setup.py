@@ -65,7 +65,7 @@ setup(
       "pre-commit",
       "numpy",
       "ruff",
-      "spidev",
+      "spidev; platform_system == 'Linux'",
       "setuptools", # for setup.py
     ],
   },
