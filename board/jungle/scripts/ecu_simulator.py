@@ -52,7 +52,7 @@ def send_vin(dev, packet):
     return False
 
   total_sent = 0
-  total_to_send = 20
+  total_to_send = len(VIN) + 2
   # Send first vin frame
   d = bytearray(2)
   d[0] = 0x10
