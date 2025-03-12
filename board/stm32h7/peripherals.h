@@ -57,22 +57,6 @@ void common_init_gpio(void) {
   set_gpio_mode(GPIOE, 4, MODE_OUTPUT);
   set_gpio_output_type(GPIOE, 4, OUTPUT_TYPE_OPEN_DRAIN);
 
-#ifdef RICHIE
-  //A6,B1: OBD_SBU1, OBD_SBU2
-  set_gpio_pullup(GPIOA, 6, PULL_NONE);
-  set_gpio_mode(GPIOA, 6, MODE_ANALOG);
-
-  set_gpio_pullup(GPIOB, 1, PULL_NONE);
-  set_gpio_mode(GPIOB, 1, MODE_ANALOG);
-#else
-  //C4,A1: OBD_SBU1, OBD_SBU2
-  set_gpio_pullup(GPIOC, 4, PULL_NONE);
-  set_gpio_mode(GPIOC, 4, MODE_ANALOG);
-
-  set_gpio_pullup(GPIOA, 1, PULL_NONE);
-  set_gpio_mode(GPIOA, 1, MODE_ANALOG);
-#endif
-
 #ifndef RICHIE
   //F11: VOLT_S
   set_gpio_pullup(GPIOF, 11, PULL_NONE);

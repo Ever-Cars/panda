@@ -23,17 +23,6 @@ static void richie_enable_can_transceiver(uint8_t transceiver, bool enabled) {
   }
 }
 
-static void richie_enable_can_transceivers(bool enabled) {
-  uint8_t main_bus = 1U;
-  for (uint8_t i = 1U; i <= NUM_CAN_BUSES; i++) {
-    // Leave main CAN always on for CAN-based ignition detection
-    if (i == main_bus)
-      richie_enable_can_transceiver(i, true);
-    else
-      richie_enable_can_transceiver(i, enabled);
-  }
-}
-
 static void richie_set_led(uint8_t color, bool enabled) {
   switch (color) {
     case LED_RED:
@@ -76,6 +65,13 @@ static bool richie_check_ignition(void) {
 static void richie_init(void) {
   common_init_gpio();
 
+  // A6,B1: OBD_SBU1, OBD_SBU2
+  set_gpio_pullup(GPIOA, 6, PULL_NONE);
+  set_gpio_mode(GPIOA, 6, MODE_ANALOG);
+
+  set_gpio_pullup(GPIOB, 1, PULL_NONE);
+  set_gpio_mode(GPIOB, 1, MODE_ANALOG);
+
   // B2,B3: transceiver standby
   set_gpio_pullup(GPIOB, 2, PULL_NONE);
   set_gpio_mode(GPIOB, 2, MODE_OUTPUT);
@@ -95,22 +91,6 @@ static void richie_init(void) {
   set_gpio_mode(GPIOA, 3, MODE_INPUT);
   set_gpio_mode(GPIOA, 5, MODE_INPUT);
 
-  // Initialize harness
-  harness_init();
-
-  // Enable CAN transceivers
-  richie_enable_can_transceivers(true);
-
-  // Disable LEDs
-  richie_set_led(LED_RED, false);
-#ifndef HW_RICHIE_REV1
-  richie_set_led(LED_GREEN, false);
-#endif
-  richie_set_led(LED_BLUE, false);
-
-  // Set normal CAN mode
-  richie_set_can_mode(CAN_MODE_NORMAL);
-
   // SPI init
   gpio_spi_init();
 }
@@ -128,7 +108,6 @@ static harness_configuration richie_harness_config = {
 board board_richie = {
   .set_bootkick = unused_set_bootkick,
   .harness_config = &richie_harness_config,
-  .has_obd = true,
   .has_spi = true,
   .has_canfd = true,
   .fan_max_rpm = 0U,
@@ -139,7 +118,6 @@ board board_richie = {
   .init = richie_init,
   .init_bootloader = unused_init_bootloader,
   .enable_can_transceiver = richie_enable_can_transceiver,
-  .enable_can_transceivers = richie_enable_can_transceivers,
   .set_led = richie_set_led,
   .set_can_mode = richie_set_can_mode,
   .check_ignition = richie_check_ignition,
