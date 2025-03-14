@@ -42,7 +42,11 @@ int comms_control_handler(ControlPacket_t *req, uint8_t *resp) {
         flash_unlock();
         resp[1] = 0xff;
       }
-      current_board->set_led(LED_BLUE, 1);
+    #ifdef HW_RICHIE_REV1
+      led_set(LED_BLUE, 1);
+    #else
+      led_set(LED_GREEN, 1);
+    #endif
       unlocked = true;
       prog_ptr = (uint32_t *)APP_START_ADDRESS;
       break;
@@ -119,7 +123,7 @@ int comms_control_handler(ControlPacket_t *req, uint8_t *resp) {
       break;
     // **** 0xe9: Set LED
     case 0xe9:
-      current_board->set_led(req->param1, req->param2);
+      led_set(req->param1, req->param2);
       break;
   }
   return resp_len;
@@ -139,14 +143,14 @@ int comms_can_read(uint8_t *data, uint32_t max_len) {
 void refresh_can_tx_slots_available(void) {}
 
 void comms_endpoint2_write(const uint8_t *data, uint32_t len) {
-  current_board->set_led(LED_RED, 0);
+  led_set(LED_RED, 0);
   for (uint32_t i = 0; i < len/4; i++) {
     flash_write_word(prog_ptr, *(uint32_t*)(data+(i*4)));
 
     //*(uint64_t*)(&spi_tx_buf[0x30+(i*4)]) = *prog_ptr;
     prog_ptr++;
   }
-  current_board->set_led(LED_RED, 1);
+  led_set(LED_RED, 1);
 }
 
 
@@ -160,6 +164,7 @@ void soft_flasher_start(void) {
 
   gpio_uart7_init();
   gpio_usb_init();
+  led_init();
 
   // enable USB
   usb_init();
@@ -172,18 +177,31 @@ void soft_flasher_start(void) {
     print("SPI initialized\n");
   }
 
+#ifdef HW_RICHIE_REV1
   // LED footprint is incorrect. Green LED turns power on to LEDs when 0
-  current_board->set_led(LED_GREEN, 0);
-  current_board->set_led(LED_BLUE, 1);
+  led_set(LED_GREEN, 0);
+  led_set(LED_BLUE, 1);
+#else
+  // green LED on for flashing
+  led_set(LED_GREEN, 1);
+#endif
 
   enable_interrupts();
   print("Interrupts enabled\n");
 
   for (;;) {
     // blink the green LED fast
-    current_board->set_led(LED_BLUE, 0);
+  #ifdef HW_RICHIE_REV1
+    led_set(LED_BLUE, 0);
+  #else
+    led_set(LED_GREEN, 0);
+  #endif
     delay(500000);
-    current_board->set_led(LED_BLUE, 1);
+  #ifdef HW_RICHIE_REV1
+    led_set(LED_BLUE, 1);
+  #else
+    led_set(LED_GREEN, 1);
+  #endif
     delay(500000);
   }
 }
