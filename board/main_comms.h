@@ -324,7 +324,7 @@ int comms_control_handler(ControlPacket_t *req, uint8_t *resp) {
       break;
     // **** 0xe9: Set LED
     case 0xe9:
-      current_board->set_led(req->param1, req->param2);
+      led_set(req->param1, req->param2);
       break;
     // **** 0xf1: Clear CAN ring buffer.
     case 0xf1:

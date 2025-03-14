@@ -58,4 +58,4 @@ index 31e713d4..b53094ce 100644
 +
        #ifdef DEBUG_FAULTS
        } else {
-           current_board->set_led(LED_RED, 1);
+          led_set(LED_RED, 1);
