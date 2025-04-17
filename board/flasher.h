@@ -170,12 +170,13 @@ void soft_flasher_start(void) {
   usb_init();
   print("USB initialized\n");
 
-  // enable SPI
+#ifdef ENABLE_SPI
   if (current_board->has_spi) {
     gpio_spi_init();
     spi_init();
     print("SPI initialized\n");
   }
+#endif
 
 #ifdef HW_RICHIE_REV1
   // LED footprint is incorrect. Green LED turns power on to LEDs when 0
