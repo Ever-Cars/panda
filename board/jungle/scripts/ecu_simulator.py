@@ -1,22 +1,44 @@
 #!/usr/bin/env python3
 import os
 import random
+import argparse
+import hexdump
 from pandajungle import PandaJungle
 
+DEBUG = False
 VIN = 'SADHD2S17N1618222'
 ids = {
   0x7e5 : 0x7ea # Jaguar IPace VIN
 }
 
+def dumpPacket(addr, data, bus, pre=''):
+  if not DEBUG:
+    return
+  dump = hexdump.hexdump(data, result='return')
+  print(f'{pre} ({hex(addr)}, {bus}): {dump[10:]}')
+
+# Packet is a tuple of Address (int), Data (bytearray), Bus (int)
+def dumpPackets(p, pre=''):
+  if not DEBUG:
+    return
+  for addr, data, bus in p:
+    dumpPacket(addr, data, bus, pre)
+
 def pad_array(barr):
   barr.extend(bytearray(8-len(barr)))
   return barr
+
+def send(dev, addr, data, bus):
+  dumpPacket(addr, data, bus, 'TX')
+  print()
+  dev.can_send(addr, data, bus)
 
 def recv(dev):
   while True:
     packet = dev.can_recv()
     if len(packet) == 0:
       continue
+    dumpPackets(packet, 'RX')
     return packet
 
 def wait_for_continue(dev):
@@ -52,7 +74,7 @@ def send_vin(dev, packet):
     return False
 
   total_sent = 0
-  total_to_send = len(VIN) + 2
+  total_to_send = len(VIN) + len(resp)
   # Send first vin frame
   d = bytearray(2)
   d[0] = 0x10
@@ -64,11 +86,11 @@ def send_vin(dev, packet):
     d.append(0x01)
   
   # Add the VIN
-  total_sent = 8 - len(d)
-  d.extend(VIN[:total_sent].encode())
-  print(f'Sending {d} with len {len(d)} on bus {bus}')
-  dev.can_send(ids[address], d, bus)
-  total_to_send -= total_sent
+  vin_index = 8 - len(d)
+  d.extend(VIN[:vin_index].encode())
+  # dev.can_send(ids[address], d, bus)
+  send(dev, ids[address], d, bus)
+  total_to_send -= vin_index + len(resp)
 
   if not wait_for_continue(dev):
     print(f'Unable to get continue frame')
@@ -79,14 +101,14 @@ def send_vin(dev, packet):
   while total_to_send > 0:
     d = bytearray(1)
     d[0] = 0x20 + frame_num
-    d.extend(bytearray(VIN[total_sent:total_sent+7].encode()))
+    d.extend(bytearray(VIN[vin_index:vin_index+7].encode()))
     d = pad_array(d)
 
-    print(f'Sending {d} with len {len(d)} on bus {bus}')
-    dev.can_send(ids[address], d, bus)
-    total_sent += 7
+    # dev.can_send(ids[address], d, bus)
+    send(dev, ids[address], d, bus)
+    vin_index += 7
     frame_num += 1
-    total_to_send -= 8
+    total_to_send -= 7
   
   return True
 
@@ -103,7 +125,14 @@ def wait_for_request(dev):
 
 
 if __name__ == "__main__":
+  parser = argparse.ArgumentParser(
+                    description='Simulate a vehicle ECU to get VIN')
+  parser.add_argument('-d', '--debug', action='store_true', help='Print CAN packet exchange information')
+  args = parser.parse_args()
+
+  DEBUG = args.debug
   p = PandaJungle()
+  p.can_clear(0xFFFF)
   p.set_safety_mode(PandaJungle.SAFETY_ALLOUTPUT)
   wait_for_request(p)
 
