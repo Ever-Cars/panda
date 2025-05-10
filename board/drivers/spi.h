@@ -91,6 +91,10 @@ void spi_rx_done(void) {
   static uint8_t spi_endpoint;
   static uint16_t spi_data_len_miso;
 
+#ifdef TIME_ANALYSIS
+  uint32_t t1, delta;
+  t1 = microsecond_timer_get();
+#endif
   // parse header
   spi_endpoint = spi_buf_rx[1];
   spi_data_len_mosi = (spi_buf_rx[3] << 8) | spi_buf_rx[2];
@@ -205,9 +209,19 @@ void spi_rx_done(void) {
   if (!checksum_valid && (spi_checksum_error_count < UINT16_MAX)) {
     spi_checksum_error_count += 1U;
   }
+#ifdef TIME_ANALYSIS
+  delta = microsecond_timer_get() - t1;
+  print("RX delta: ");
+  puth(delta);
+  print("\n");
+#endif
 }
 
 void spi_tx_done(bool reset) {
+#ifdef TIME_ANALYSIS
+  uint32_t t1, delta;
+  t1 = microsecond_timer_get();
+#endif
   if ((spi_state == SPI_STATE_HEADER_NACK) || reset) {
     // Reset state
     spi_state = SPI_STATE_HEADER;
@@ -225,6 +239,12 @@ void spi_tx_done(bool reset) {
     llspi_mosi_dma(spi_buf_rx, SPI_HEADER_SIZE);
     print("SPI: TX unexpected state: "); puth(spi_state); print("\n");
   }
+#ifdef TIME_ANALYSIS
+  delta = microsecond_timer_get() - t1;
+  print("TX delta: ");
+  puth(delta);
+  print("\n");
+#endif
 }
 
 void can_tx_comms_resume_spi(void) {
