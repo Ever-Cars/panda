@@ -21,6 +21,7 @@
 
 void detect_board_type(void) {
   // On STM32H7 pandas, we use two different sets of pins.
+#ifndef RICHIE
   const uint8_t id1 = detect_with_pull(GPIOF, 7, PULL_UP) |
                      (detect_with_pull(GPIOF, 8, PULL_UP) << 1U) |
                      (detect_with_pull(GPIOF, 9, PULL_UP) << 2U) |
@@ -30,6 +31,10 @@ void detect_board_type(void) {
                      (detect_with_pull(GPIOD, 5, PULL_UP) << 1U) |
                      (detect_with_pull(GPIOD, 6, PULL_UP) << 2U) |
                      (detect_with_pull(GPIOD, 7, PULL_UP) << 3U);
+#else
+  const uint8_t id1 = 0;
+  const uint8_t id2 = 0;
+#endif
 
   if (id2 == 3U) {
     hw_type = HW_TYPE_CUATRO;

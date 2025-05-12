@@ -130,17 +130,21 @@ void soft_flasher_start(void) {
 
   flasher_peripherals_init();
 
+#ifndef RICHIE
   gpio_usart2_init();
+#endif
   gpio_usb_init();
 
   // enable USB
   usb_init();
 
   // enable SPI
+#ifndef RICHIE
   if (current_board->has_spi) {
     gpio_spi_init();
     spi_init();
   }
+#endif
 
   // green LED on for flashing
   current_board->set_led(LED_GREEN, 1);

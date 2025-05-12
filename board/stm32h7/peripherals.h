@@ -20,8 +20,13 @@ void gpio_spi_init(void) {
 
 void gpio_usart2_init(void) {
   // A2,A3: USART 2 for debugging
+#ifdef RICHIE
+  set_gpio_alternate(GPIOD, 5, GPIO_AF7_USART2);
+  set_gpio_alternate(GPIOD, 6, GPIO_AF7_USART2);
+#else
   set_gpio_alternate(GPIOA, 2, GPIO_AF7_USART2);
   set_gpio_alternate(GPIOA, 3, GPIO_AF7_USART2);
+#endif
 }
 
 void gpio_uart7_init(void) {
@@ -87,8 +92,10 @@ void flasher_peripherals_init(void) {
   RCC->AHB1ENR |= RCC_AHB1ENR_USB1OTGHSEN;
 
   // SPI + DMA
+#ifndef RICHIE
   RCC->APB2ENR |= RCC_APB2ENR_SPI1EN;
   RCC->AHB1ENR |= RCC_AHB1ENR_DMA2EN;
+#endif
 }
 
 // Peripheral initialization
