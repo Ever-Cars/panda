@@ -5,14 +5,21 @@
   #define APP_START_ADDRESS 0x8004000U
 #endif
 
+#define APP_VERSION "0.0.1"
+
 // flasher state variables
 uint32_t *prog_ptr = NULL;
 bool unlocked = false;
 
 void spi_init(void);
 
+void debug_ring_callback(uart_ring *ring) {
+  UNUSED(ring);
+}
+
 int comms_control_handler(ControlPacket_t *req, uint8_t *resp) {
   int resp_len = 0;
+  uart_ring *ur = NULL;
 
   // flasher machine
   memset(resp, 0, 4);
@@ -94,6 +101,22 @@ int comms_control_handler(ControlPacket_t *req, uint8_t *resp) {
       flush_write_buffer();
       NVIC_SystemReset();
       break;
+    // **** 0xe0: Send debug info over USB
+    case 0xe0:
+      // read
+      ur = get_ring_by_number(req->param1);
+      if (!ur) {
+        break;
+      }
+
+      resp_len = 0;
+      uint16_t req_length = MIN(req->length, USBPACKET_MAX_SIZE);
+      while ((resp_len < req_length) &&
+                         get_char(ur, (char*)&resp[resp_len])) {
+        ++resp_len;
+      }
+
+      break;
   }
   return resp_len;
 }
@@ -125,6 +148,7 @@ void comms_endpoint2_write(const uint8_t *data, uint32_t len) {
 
 void soft_flasher_start(void) {
   print("\n\n\n************************ FLASHER START ************************\n");
+  print("App Version: "APP_VERSION"\n");
 
   enter_bootloader_mode = 0;
 
