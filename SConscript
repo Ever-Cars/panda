@@ -183,7 +183,7 @@ with open("board/obj/cert.h", "w") as f:
 SConscript('board/SConscript')
 
 # panda jungle fw
-SConscript('board/jungle/SConscript')
+# SConscript('board/jungle/SConscript')
 
 # test files
 if GetOption('extras'):
