@@ -117,6 +117,10 @@ int comms_control_handler(ControlPacket_t *req, uint8_t *resp) {
       }
 
       break;
+    // **** 0xe9: Set LED
+    case 0xe9:
+      current_board->set_led(req->param1, req->param2);
+      break;
   }
   return resp_len;
 }
@@ -177,9 +181,9 @@ void soft_flasher_start(void) {
 
   for (;;) {
     // blink the green LED fast
-    current_board->set_led(LED_GREEN, 0);
+    // current_board->set_led(LED_GREEN, 0);
     delay(500000);
-    current_board->set_led(LED_GREEN, 1);
+    // current_board->set_led(LED_GREEN, 1);
     delay(500000);
   }
 }

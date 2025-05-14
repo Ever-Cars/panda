@@ -824,6 +824,10 @@ class Panda:
   def set_uart_callback(self, uart, install):
     self._handle.controlWrite(Panda.REQUEST_OUT, 0xe3, uart, int(install), b'')
 
+  # LED stuff
+  def set_led(self, led, state):
+    self._handle.controlWrite(Panda.REQUEST_OUT, 0xe9, led, state, b'')
+
   # ******************* can *******************
 
   # The panda will NAK CAN writes when there is CAN congestion.
