@@ -20,17 +20,12 @@ void gpio_spi_init(void) {
 
 void gpio_usart2_init(void) {
   // A2,A3: USART 2 for debugging
-#ifdef RICHIE
-  set_gpio_alternate(GPIOD, 5, GPIO_AF7_USART2);
-  set_gpio_alternate(GPIOD, 6, GPIO_AF7_USART2);
-#else
   set_gpio_alternate(GPIOA, 2, GPIO_AF7_USART2);
   set_gpio_alternate(GPIOA, 3, GPIO_AF7_USART2);
-#endif
 }
 
 void gpio_uart7_init(void) {
-  // E7,E8: UART 7 for debugging
+  // E7,E8: UART 7 connected to nRF
   set_gpio_alternate(GPIOE, 7, GPIO_AF7_UART7);
   set_gpio_alternate(GPIOE, 8, GPIO_AF7_UART7);
 }

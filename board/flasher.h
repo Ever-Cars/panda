@@ -5,7 +5,7 @@
   #define APP_START_ADDRESS 0x8004000U
 #endif
 
-#define APP_VERSION "0.0.1"
+#define APP_VERSION "0.0.2"
 
 // flasher state variables
 uint32_t *prog_ptr = NULL;
@@ -158,9 +158,7 @@ void soft_flasher_start(void) {
 
   flasher_peripherals_init();
 
-#ifndef RICHIE
-  gpio_usart2_init();
-#endif
+  gpio_uart7_init();
   gpio_usb_init();
 
   // enable USB
