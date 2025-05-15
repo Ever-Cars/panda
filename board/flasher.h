@@ -42,7 +42,7 @@ int comms_control_handler(ControlPacket_t *req, uint8_t *resp) {
         flash_unlock();
         resp[1] = 0xff;
       }
-      current_board->set_led(LED_GREEN, 1);
+      current_board->set_led(LED_BLUE, 1);
       unlocked = true;
       prog_ptr = (uint32_t *)APP_START_ADDRESS;
       break;
@@ -165,25 +165,29 @@ void soft_flasher_start(void) {
 
   // enable USB
   usb_init();
+  print("USB initialized\n");
 
   // enable SPI
 #ifndef RICHIE
   if (current_board->has_spi) {
     gpio_spi_init();
     spi_init();
+    print("SPI initialized\n");
   }
 #endif
 
-  // green LED on for flashing
-  current_board->set_led(LED_GREEN, 1);
+  // LED footprint is incorrect. Green LED turns power on to LEDs when 0
+  current_board->set_led(LED_GREEN, 0);
+  current_board->set_led(LED_BLUE, 1);
 
   enable_interrupts();
+  print("Interrupts enabled\n");
 
   for (;;) {
     // blink the green LED fast
-    // current_board->set_led(LED_GREEN, 0);
+    current_board->set_led(LED_BLUE, 0);
     delay(500000);
-    // current_board->set_led(LED_GREEN, 1);
+    current_board->set_led(LED_BLUE, 1);
     delay(500000);
   }
 }
