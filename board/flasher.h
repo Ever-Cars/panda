@@ -5,7 +5,7 @@
   #define APP_START_ADDRESS 0x8004000U
 #endif
 
-#define APP_VERSION "0.0.2"
+#define APP_VERSION "0.0.3"
 
 // flasher state variables
 uint32_t *prog_ptr = NULL;
@@ -166,13 +166,11 @@ void soft_flasher_start(void) {
   print("USB initialized\n");
 
   // enable SPI
-#ifndef RICHIE
   if (current_board->has_spi) {
     gpio_spi_init();
     spi_init();
     print("SPI initialized\n");
   }
-#endif
 
   // LED footprint is incorrect. Green LED turns power on to LEDs when 0
   current_board->set_led(LED_GREEN, 0);

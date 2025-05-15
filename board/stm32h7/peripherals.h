@@ -10,12 +10,12 @@ static void gpio_usb_init(void) {
 }
 
 void gpio_spi_init(void) {
-  set_gpio_alternate(GPIOA, 4, GPIO_AF5_SPI1);
-  set_gpio_alternate(GPIOA, 5, GPIO_AF5_SPI1);
-  set_gpio_alternate(GPIOA, 6, GPIO_AF5_SPI1);
-  set_gpio_alternate(GPIOA, 7, GPIO_AF5_SPI1);
-  register_set_bits(&(GPIOA->OSPEEDR), GPIO_OSPEEDR_OSPEED4 | GPIO_OSPEEDR_OSPEED5 | 
-     GPIO_OSPEEDR_OSPEED6 | GPIO_OSPEEDR_OSPEED7);
+  set_gpio_alternate(GPIOE, 11, GPIO_AF5_SPI4);
+  set_gpio_alternate(GPIOE, 12, GPIO_AF5_SPI4);
+  set_gpio_alternate(GPIOE, 13, GPIO_AF5_SPI4);
+  set_gpio_alternate(GPIOE, 14, GPIO_AF5_SPI4);
+  register_set_bits(&(GPIOE->OSPEEDR), GPIO_OSPEEDR_OSPEED11 | GPIO_OSPEEDR_OSPEED12 | 
+     GPIO_OSPEEDR_OSPEED13 | GPIO_OSPEEDR_OSPEED14);
 }
 
 void gpio_usart2_init(void) {
@@ -88,7 +88,7 @@ void flasher_peripherals_init(void) {
 
   // SPI + DMA
 #ifndef RICHIE
-  RCC->APB2ENR |= RCC_APB2ENR_SPI1EN;
+  RCC->APB2ENR |= RCC_APB2ENR_SPI4EN;
   RCC->AHB1ENR |= RCC_AHB1ENR_DMA2EN;
 #endif
 }
@@ -114,7 +114,7 @@ void peripherals_init(void) {
   RCC->AHB4ENR |= RCC_AHB4ENR_BDMAEN; // Audio DMA
 
   // Connectivity
-  RCC->APB2ENR |= RCC_APB2ENR_SPI1EN;  // SPI
+  RCC->APB2ENR |= RCC_APB2ENR_SPI4EN;  // SPI
   RCC->APB1LENR |= RCC_APB1LENR_I2C5EN;  // codec I2C
   RCC->AHB1ENR |= RCC_AHB1ENR_USB1OTGHSEN; // USB
   RCC->AHB1LPENR |= RCC_AHB1LPENR_USB1OTGHSLPEN; // USB LP needed for CSleep state(__WFI())
