@@ -11,7 +11,8 @@ build_projects = {
 for project_name, project in build_projects.items():
   flags = [
     "-DPANDA",
-    "-DRICHIE"
+    "-DRICHIE",
+    "-DHW_RICHIE_REV1"
   ]
   if ("ENABLE_SPI" in os.environ or "h7" in project_name):
     flags.append('-DENABLE_SPI')

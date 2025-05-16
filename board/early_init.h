@@ -59,7 +59,9 @@ void early_initialization(void) {
     #ifdef PANDA
     current_board->init_bootloader();
     #endif
+  #ifndef HW_RICHIE_REV1
     current_board->set_led(LED_GREEN, 1);
+  #endif
     jump_to_bootloader();
   }
 }

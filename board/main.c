@@ -190,7 +190,9 @@ static void tick_handler(void) {
       #endif
 
       // set green LED to be controls allowed
+    #ifndef HW_RICHIE_REV1
       current_board->set_led(LED_GREEN, controls_allowed | green_led_enabled);
+    #endif
 
       // turn off the blue LED, turned on by CAN
       // unless we are in power saving mode
@@ -308,7 +310,7 @@ int main(void) {
   detect_board_type();
   // red+green leds enabled until succesful USB/SPI init, as a debug indicator
   current_board->set_led(LED_RED, true);
-  current_board->set_led(LED_GREEN, true);
+  current_board->set_led(LED_BLUE, true);
   adc_init();
 
   // print hello

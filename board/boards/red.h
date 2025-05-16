@@ -150,7 +150,9 @@ static void red_init(void) {
 
   // Disable LEDs
   red_set_led(LED_RED, false);
+#ifndef HW_RICHIE_REV1
   red_set_led(LED_GREEN, false);
+#endif
   red_set_led(LED_BLUE, false);
 
   // Set normal CAN mode

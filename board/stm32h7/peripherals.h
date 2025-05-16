@@ -37,9 +37,15 @@ void common_init_gpio(void) {
   set_gpio_mode(GPIOE, 2, MODE_OUTPUT);
   set_gpio_output_type(GPIOE, 2, OUTPUT_TYPE_OPEN_DRAIN);
 
+#ifdef HW_RICHIE_REV1
   set_gpio_pullup(GPIOE, 3, PULL_NONE);
+#else
+  set_gpio_pullup(GPIOE, 3, PULL_NONE);
+#endif
   set_gpio_mode(GPIOE, 3, MODE_OUTPUT);
+#ifndef HW_RICHIE_REV1
   set_gpio_output_type(GPIOE, 3, OUTPUT_TYPE_OPEN_DRAIN);
+#endif
 
   set_gpio_pullup(GPIOE, 4, PULL_NONE);
   set_gpio_mode(GPIOE, 4, MODE_OUTPUT);
@@ -87,10 +93,8 @@ void flasher_peripherals_init(void) {
   RCC->AHB1ENR |= RCC_AHB1ENR_USB1OTGHSEN;
 
   // SPI + DMA
-#ifndef RICHIE
   RCC->APB2ENR |= RCC_APB2ENR_SPI4EN;
   RCC->AHB1ENR |= RCC_AHB1ENR_DMA2EN;
-#endif
 }
 
 // Peripheral initialization
