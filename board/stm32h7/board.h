@@ -17,6 +17,7 @@
 #include "boards/red_chiplet.h"
 #include "boards/tres.h"
 #include "boards/cuatro.h"
+#include "boards/richie.h"
 
 
 void detect_board_type(void) {
@@ -32,7 +33,7 @@ void detect_board_type(void) {
                      (detect_with_pull(GPIOD, 6, PULL_UP) << 2U) |
                      (detect_with_pull(GPIOD, 7, PULL_UP) << 3U);
 #else
-  const uint8_t id1 = 0;
+  const uint8_t id1 = 1;
   const uint8_t id2 = 0;
 #endif
 
@@ -43,9 +44,8 @@ void detect_board_type(void) {
     hw_type = HW_TYPE_RED_PANDA;
     current_board = &board_red;
   } else if (id1 == 1U) {
-    // deprecated
-    //hw_type = HW_TYPE_RED_PANDA_V2;
-    hw_type = HW_TYPE_UNKNOWN;
+    hw_type = HW_TYPE_RICHIE;
+    current_board = &board_richie;
   } else if (id1 == 2U) {
     hw_type = HW_TYPE_TRES;
     current_board = &board_tres;
