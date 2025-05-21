@@ -30,3 +30,7 @@ bool unused_read_som_gpio(void) {
 void unused_set_amp_enabled(bool enabled) {
   UNUSED(enabled);
 }
+
+uint32_t unused_read_voltage_mV(void) {
+  return 0U;
+}

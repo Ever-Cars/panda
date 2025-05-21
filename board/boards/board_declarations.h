@@ -66,7 +66,7 @@ struct board {
 #define HW_TYPE_RED_PANDA_V2 8U
 #define HW_TYPE_TRES 9U
 #define HW_TYPE_CUATRO 10U
-#define HW_TYPE_RICHIE 11U
+#define HW_TYPE_RICHIE 7U // Set the same as Red because it's used in python scripts
 
 // LED colors
 #define LED_RED 0U

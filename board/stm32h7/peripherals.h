@@ -51,16 +51,27 @@ void common_init_gpio(void) {
   set_gpio_mode(GPIOE, 4, MODE_OUTPUT);
   set_gpio_output_type(GPIOE, 4, OUTPUT_TYPE_OPEN_DRAIN);
 
+#ifdef RICHIE
+  //A6,B1: OBD_SBU1, OBD_SBU2
+  set_gpio_pullup(GPIOA, 6, PULL_NONE);
+  set_gpio_mode(GPIOA, 6, MODE_ANALOG);
+
+  set_gpio_pullup(GPIOB, 1, PULL_NONE);
+  set_gpio_mode(GPIOB, 1, MODE_ANALOG);
+#else
   //C4,A1: OBD_SBU1, OBD_SBU2
   set_gpio_pullup(GPIOC, 4, PULL_NONE);
   set_gpio_mode(GPIOC, 4, MODE_ANALOG);
 
   set_gpio_pullup(GPIOA, 1, PULL_NONE);
   set_gpio_mode(GPIOA, 1, MODE_ANALOG);
+#endif
 
+#ifndef RICHIE
   //F11: VOLT_S
   set_gpio_pullup(GPIOF, 11, PULL_NONE);
   set_gpio_mode(GPIOF, 11, MODE_ANALOG);
+#endif
 
   gpio_usb_init();
 
@@ -71,9 +82,11 @@ void common_init_gpio(void) {
   set_gpio_pullup(GPIOB, 9, PULL_NONE);
   set_gpio_alternate(GPIOB, 9, GPIO_AF9_FDCAN1);
 
+#ifndef RICHIE
   // B5,B6 (mplex to B12,B13): FDCAN2
   set_gpio_pullup(GPIOB, 12, PULL_NONE);
   set_gpio_pullup(GPIOB, 13, PULL_NONE);
+#endif
 
   set_gpio_pullup(GPIOB, 5, PULL_NONE);
   set_gpio_alternate(GPIOB, 5, GPIO_AF9_FDCAN2);
@@ -81,12 +94,14 @@ void common_init_gpio(void) {
   set_gpio_pullup(GPIOB, 6, PULL_NONE);
   set_gpio_alternate(GPIOB, 6, GPIO_AF9_FDCAN2);
 
+#ifndef RICHIE
   // G9,G10: FDCAN3
   set_gpio_pullup(GPIOG, 9, PULL_NONE);
   set_gpio_alternate(GPIOG, 9, GPIO_AF2_FDCAN3);
 
   set_gpio_pullup(GPIOG, 10, PULL_NONE);
   set_gpio_alternate(GPIOG, 10, GPIO_AF2_FDCAN3);
+#endif
 }
 
 void flasher_peripherals_init(void) {
