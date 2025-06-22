@@ -19,9 +19,15 @@ void gpio_spi_init(void) {
 }
 
 void gpio_usart2_init(void) {
+#ifndef RICHIE
   // A2,A3: USART 2 for debugging
   set_gpio_alternate(GPIOA, 2, GPIO_AF7_USART2);
   set_gpio_alternate(GPIOA, 3, GPIO_AF7_USART2);
+#else
+  // D5,D6: USART 2 for debugging
+  set_gpio_alternate(GPIOD, 5, GPIO_AF7_USART2);
+  set_gpio_alternate(GPIOD, 6, GPIO_AF7_USART2);
+#endif
 }
 
 void gpio_uart7_init(void) {
