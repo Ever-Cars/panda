@@ -90,6 +90,11 @@ static void richie_init(void) {
   set_gpio_pullup(GPIOB, 7, PULL_NONE);
   set_gpio_mode(GPIOB, 7, MODE_OUTPUT);
 
+  // B13, A3, A5: nRF9151 gpios
+  set_gpio_mode(GPIOB, 13, MODE_INPUT);
+  set_gpio_mode(GPIOA, 3, MODE_INPUT);
+  set_gpio_mode(GPIOA, 5, MODE_INPUT);
+
   // Initialize harness
   harness_init();
 
