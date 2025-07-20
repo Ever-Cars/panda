@@ -13,13 +13,17 @@ bool unlocked = false;
 
 void spi_init(void);
 
+#ifdef BOOTSTUB_DEBUG
 void debug_ring_callback(uart_ring *ring) {
   UNUSED(ring);
 }
+#endif
 
 int comms_control_handler(ControlPacket_t *req, uint8_t *resp) {
   int resp_len = 0;
+#ifdef BOOTSTUB_DEBUG
   uart_ring *ur = NULL;
+#endif
 
   // flasher machine
   memset(resp, 0, 4);
@@ -106,6 +110,7 @@ int comms_control_handler(ControlPacket_t *req, uint8_t *resp) {
       NVIC_SystemReset();
       break;
     // **** 0xe0: Send debug info over USB
+  #ifdef BOOTSTUB_DEBUG
     case 0xe0:
       // read
       ur = get_ring_by_number(req->param1);
@@ -121,6 +126,7 @@ int comms_control_handler(ControlPacket_t *req, uint8_t *resp) {
       }
 
       break;
+  #endif
     // **** 0xe9: Set LED
     case 0xe9:
       led_set(req->param1, req->param2);
@@ -162,21 +168,21 @@ void soft_flasher_start(void) {
 
   flasher_peripherals_init();
 
+#ifdef RICHIE
   gpio_uart7_init();
+#else
+  gpio_usart2_init();
+#endif
   gpio_usb_init();
   led_init();
 
-  // enable USB
+  // enable comms
   usb_init();
-  print("USB initialized\n");
-
-#ifdef ENABLE_SPI
   if (current_board->has_spi) {
     gpio_spi_init();
     spi_init();
     print("SPI initialized\n");
   }
-#endif
 
 #ifdef HW_RICHIE_REV1
   // LED footprint is incorrect. Green LED turns power on to LEDs when 0

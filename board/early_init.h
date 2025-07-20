@@ -57,9 +57,7 @@ void early_initialization(void) {
 
   if (enter_bootloader_mode == ENTER_BOOTLOADER_MAGIC) {
     led_init();
-    #ifdef PANDA
     current_board->init_bootloader();
-    #endif
   #ifndef HW_RICHIE_REV1
     led_set(LED_GREEN, 1);
   #endif
