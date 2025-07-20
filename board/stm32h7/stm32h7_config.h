@@ -46,11 +46,11 @@ separate IRQs for RX and TX.
 #include "can.h"
 #include "comms_definitions.h"
 
-// #ifndef BOOTSTUB
+#if !defined(BOOTSTUB) && !defined(BOOTSTUB_DEBUG)
   #include "main_definitions.h"
-// #else
-//   #include "bootstub_declarations.h"
-// #endif
+#else
+  #include "bootstub_declarations.h"
+#endif
 
 #include "libc.h"
 #include "critical.h"
@@ -64,10 +64,10 @@ separate IRQs for RX and TX.
 #include "stm32h7/interrupt_handlers.h"
 #include "drivers/timers.h"
 
-// #if !defined(BOOTSTUB)
+#if !defined(BOOTSTUB) && !defined(BOOTSTUB_DEBUG)
   #include "drivers/uart.h"
   #include "stm32h7/lluart.h"
-// #endif
+#endif
 
 #include "stm32h7/board.h"
 #include "stm32h7/clock.h"
