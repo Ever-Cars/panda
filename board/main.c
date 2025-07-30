@@ -289,7 +289,7 @@ int main(void) {
 #else
   led_set(LED_GREEN, true);
 #endif
-  adc_init();
+  adc_init(ADC1);
 
   // print hello
   print("\n\n\n************************ MAIN START ************************\n");

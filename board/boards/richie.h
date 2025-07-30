@@ -74,8 +74,8 @@ static harness_configuration richie_harness_config = {
   .GPIO_relay_SBU2 = NULL,
   .pin_SBU1 = 6,
   .pin_SBU2 = 1,
-  .adc_channel_SBU1 = 3, //ADC12_INP3
-  .adc_channel_SBU2 = 5 //ADC1_INP5
+  .adc_signal_SBU1 = ADC_CHANNEL_DEFAULT(ADC1, 3), // ADC12_INP3
+  .adc_signal_SBU2 = ADC_CHANNEL_DEFAULT(ADC1, 5) // ADC1_INP5
 };
 
 board board_richie = {
