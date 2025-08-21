@@ -5,6 +5,7 @@ import contextlib
 import random
 from termcolor import cprint
 
+from opendbc.car.structs import CarParams
 from panda import Panda
 from pandajungle import PandaJungle
 
@@ -89,7 +90,7 @@ def can_loopback(sender):
 def test_loopback():
   # disable safety modes
   for panda in pandas:
-    panda.set_safety_mode(Panda.SAFETY_ELM327 if FOR_RELEASE_BUILDS else Panda.SAFETY_ALLOUTPUT)
+    panda.set_safety_mode(CarParams.SafetyModel.elm327 if FOR_RELEASE_BUILDS else CarParams.SafetyModel.allOutput)
 
   # perform loopback with jungle as a sender
   can_loopback(jungle)
@@ -100,7 +101,7 @@ def test_loopback():
 
   # enable safety modes
   for panda in pandas:
-    panda.set_safety_mode(Panda.SAFETY_SILENT)
+    panda.set_safety_mode(CarParams.SafetyModel.silent)
 
 #################################################################
 ############################# MAIN ##############################
