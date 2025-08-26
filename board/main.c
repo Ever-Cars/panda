@@ -168,7 +168,7 @@ static void tick_handler(void) {
 
       // set green LED to be controls allowed
     #ifndef HW_RICHIE_REV1
-      led_set(LED_GREEN, controls_allowed | green_led_enabled);
+      led_set(LED_GREEN, controls_allowed);
     #endif
 
       // turn off the blue LED, turned on by CAN
