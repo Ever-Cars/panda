@@ -6,8 +6,7 @@ import random
 from termcolor import cprint
 
 from opendbc.car.structs import CarParams
-from panda import Panda
-from pandajungle import PandaJungle
+from panda import Panda PandaJungle
 
 NUM_PANDAS_PER_TEST = 1
 FOR_RELEASE_BUILDS = os.getenv("RELEASE") is not None       # Release builds do not have ALLOUTPUT mode

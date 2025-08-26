@@ -4,7 +4,7 @@ import time
 import subprocess
 import argparse
 
-from pandajungle import PandaJungle, PandaJungleDFU
+from panda import PandaJungle, PandaJungleDFU
 
 board_path = os.path.dirname(os.path.realpath(__file__))
 

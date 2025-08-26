@@ -2,7 +2,7 @@
 import os
 import random
 from opendbc.car.structs import CarParams
-from pandajungle import PandaJungle
+from panda import PandaJungle
 
 def get_test_string():
   return b"test" + os.urandom(10)

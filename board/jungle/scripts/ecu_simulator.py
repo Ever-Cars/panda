@@ -3,7 +3,7 @@ import os
 import random
 import argparse
 import hexdump
-from pandajungle import PandaJungle
+from panda import PandaJungle
 
 DEBUG = False
 VIN = 'SADHD2S17N1618222'

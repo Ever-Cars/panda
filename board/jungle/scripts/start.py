@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import sys
 
-from pandajungle import PandaJungle
+from panda import PandaJungle
 
 if __name__ == "__main__":
   jungle = PandaJungle()

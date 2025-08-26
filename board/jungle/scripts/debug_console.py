@@ -3,7 +3,7 @@ import os
 import sys
 import time
 
-from pandajungle import PandaJungle
+from panda import PandaJungle
 
 setcolor = ["\033[1;32;40m", "\033[1;31;40m"]
 unsetcolor = "\033[00m"
