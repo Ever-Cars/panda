@@ -16,11 +16,7 @@
 
 #include "board/drivers/can_common.h"
 
-#ifdef STM32H7
-  #include "board/drivers/fdcan.h"
-#else
-  #include "board/drivers/bxcan.h"
-#endif
+#include "board/drivers/fdcan.h"
 
 #include "board/power_saving.h"
 
@@ -29,6 +25,13 @@
 #include "board/can_comms.h"
 #include "board/main_comms.h"
 
+#ifdef HW_RICHIE_REV1
+  #define BOARD_NAME "Richie Rev 1"
+#elif defined(RICHIE)
+  #define BOARD_NAME "Richie"
+#else
+  #define BOARD_NAME "Panda"
+#endif
 
 // ********************* Serial debugging *********************
 
@@ -165,7 +168,7 @@ static void tick_handler(void) {
 
       // set green LED to be controls allowed
     #ifndef HW_RICHIE_REV1
-      led_set(LED_GREEN, controls_allowed | green_led_enabled);
+      led_set(LED_GREEN, controls_allowed);
     #endif
 
       // turn off the blue LED, turned on by CAN
@@ -292,7 +295,7 @@ int main(void) {
   adc_init(ADC1);
 
   // print hello
-  print("\n\n\n************************ MAIN START ************************\n");
+  print("\n\n\n************************ MAIN START " BOARD_NAME " ************************\n");
 
   // check for non-supported board types
   assert_fatal(hw_type != HW_TYPE_UNKNOWN, "Unsupported board type");
