@@ -90,7 +90,7 @@ void flasher_peripherals_init(void) {
 }
 #endif
 
-// Peripheral initialization
+// Peripheral initialization fixme: disable unused peripherals for richie
 void peripherals_init(void) {
   // enable GPIO(A,B,C,D,E,F,G,H)
   RCC->AHB4ENR |= RCC_AHB4ENR_GPIOAEN;

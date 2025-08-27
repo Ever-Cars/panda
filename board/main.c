@@ -29,6 +29,13 @@
 #include "board/can_comms.h"
 #include "board/main_comms.h"
 
+#ifdef HW_RICHIE_REV1
+  #define BOARD_NAME "Richie Rev 1"
+#elif defined(RICHIE)
+  #define BOARD_NAME "Richie"
+#else
+  #define BOARD_NAME "Panda"
+#endif
 
 // ********************* Serial debugging *********************
 
@@ -292,7 +299,7 @@ int main(void) {
   adc_init(ADC1);
 
   // print hello
-  print("\n\n\n************************ MAIN START ************************\n");
+  print("\n\n\n************************ MAIN START " BOARD_NAME " ************************\n");
 
   // check for non-supported board types
   assert_fatal(hw_type != HW_TYPE_UNKNOWN, "Unsupported board type");
