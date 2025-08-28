@@ -1,22 +1,8 @@
-diff --git a/board/SConscript b/board/SConscript
-index 949f1b4d..a14c73ce 100644
---- a/board/SConscript
-+++ b/board/SConscript
-@@ -12,7 +12,8 @@ for project_name, project in build_projects.items():
-   flags = [
-     "-DPANDA",
-     "-DRICHIE",
--    "-DHW_RICHIE_REV1"
-+    "-DHW_RICHIE_REV1",
-+    "-DRICHIE_DEBUG",  # Enable debug features
-   ]
-   if ("ENABLE_SPI" in os.environ or "h7" in project_name):
-     flags.append('-DENABLE_SPI')
 diff --git a/board/main.c b/board/main.c
-index 31e713d4..b53094ce 100644
+index 1e2c80b0..85a954bd 100644
 --- a/board/main.c
 +++ b/board/main.c
-@@ -366,6 +366,16 @@ int main(void) {
+@@ -349,6 +349,16 @@ int main(void) {
    print("**** INTERRUPTS ON ****\n");
    enable_interrupts();
  
@@ -33,7 +19,7 @@ index 31e713d4..b53094ce 100644
    // LED should keep on blinking all the time
    while (true) {
      if (power_save_status == POWER_SAVE_STATUS_DISABLED) {
-@@ -387,6 +397,25 @@ int main(void) {
+@@ -370,6 +380,25 @@ int main(void) {
            delay((MAX_LED_FADE - fade) >> 4);
          }
  
@@ -58,4 +44,70 @@ index 31e713d4..b53094ce 100644
 +
        #ifdef DEBUG_FAULTS
        } else {
-          led_set(LED_RED, 1);
+           led_set(LED_RED, 1);
+diff --git a/tests/richie/bringup-gpio-test.diff b/tests/richie/bringup-gpio-test.diff
+index 75bbdf69..e69de29b 100644
+--- a/tests/richie/bringup-gpio-test.diff
++++ b/tests/richie/bringup-gpio-test.diff
+@@ -1,61 +0,0 @@
+-diff --git a/board/SConscript b/board/SConscript
+-index 949f1b4d..a14c73ce 100644
+---- a/board/SConscript
+-+++ b/board/SConscript
+-@@ -12,7 +12,8 @@ for project_name, project in build_projects.items():
+-   flags = [
+-     "-DPANDA",
+-     "-DRICHIE",
+--    "-DHW_RICHIE_REV1"
+-+    "-DHW_RICHIE_REV1",
+-+    "-DRICHIE_DEBUG",  # Enable debug features
+-   ]
+-   if ("ENABLE_SPI" in os.environ or "h7" in project_name):
+-     flags.append('-DENABLE_SPI')
+-diff --git a/board/main.c b/board/main.c
+-index 31e713d4..b53094ce 100644
+---- a/board/main.c
+-+++ b/board/main.c
+-@@ -366,6 +366,16 @@ int main(void) {
+-   print("**** INTERRUPTS ON ****\n");
+-   enable_interrupts();
+- 
+-+#ifdef RICHIE_DEBUG
+-+  // Read GPIO lines
+-+  int gpio1 = get_gpio_input(GPIOB, 13);
+-+  int gpio2 = get_gpio_input(GPIOA, 3);
+-+  int gpio3 = get_gpio_input(GPIOA, 5);
+-+  print("GPIO1: "); puth(gpio1); 
+-+  print("\nGPIO2: "); puth(gpio2); 
+-+  print("\nGPIO3: "); puth(gpio3); print("\n");
+-+#endif
+-+
+-   // LED should keep on blinking all the time
+-   while (true) {
+-     if (power_save_status == POWER_SAVE_STATUS_DISABLED) {
+-@@ -387,6 +397,25 @@ int main(void) {
+-           delay((MAX_LED_FADE - fade) >> 4);
+-         }
+- 
+-+      #ifdef RICHIE_DEBUG
+-+        // Check if debug gpios have toggled
+-+        int tmp = get_gpio_input(GPIOB, 13);
+-+        if (tmp != gpio1) {
+-+          gpio1 = tmp;
+-+          print("GPIO1: "); puth(gpio1); print("\n");
+-+        }
+-+        tmp = get_gpio_input(GPIOA, 3);
+-+        if (tmp != gpio2) {
+-+          gpio2 = tmp;
+-+          print("GPIO2: "); puth(gpio1); print("\n");
+-+        }
+-+        tmp = get_gpio_input(GPIOA, 5);
+-+        if (tmp != gpio3) {
+-+          gpio3 = tmp;
+-+          print("GPIO3: "); puth(gpio1); print("\n");
+-+        }
+-+      #endif
+-+
+-       #ifdef DEBUG_FAULTS
+-       } else {
+-          led_set(LED_RED, 1);
