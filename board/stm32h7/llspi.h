@@ -51,10 +51,16 @@ void llspi_miso_dma(uint8_t *addr, int len) {
 static bool spi_tx_dma_done = false;
 // master -> panda DMA finished
 static void DMA2_Stream2_IRQ_Handler(void) {
+#ifdef RICHIE
+  set_gpio_output(GPIOA, 3, true);
+#endif
   // Clear interrupt flag
   DMA2->LIFCR = DMA_LIFCR_CTCIF2;
 
   spi_rx_done();
+#ifdef RICHIE
+  set_gpio_output(GPIOA, 3, false);
+#endif
 }
 
 // panda -> master DMA finished
@@ -69,6 +75,9 @@ static void DMA2_Stream3_IRQ_Handler(void) {
 
 // panda TX finished
 static void SPI4_IRQ_Handler(void) {
+#ifdef RICHIE
+  set_gpio_output(GPIOA, 3, true);
+#endif
   // clear flag
   SPI4->IFCR |= (0x1FFU << 3U);
 
@@ -76,6 +85,9 @@ static void SPI4_IRQ_Handler(void) {
     spi_tx_dma_done = false;
     spi_tx_done(false);
   }
+#ifdef RICHIE
+  set_gpio_output(GPIOA, 3, false);
+#endif
 }
 
 
