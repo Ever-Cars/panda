@@ -1,0 +1,65 @@
+diff --git a/board/boards/richie.h b/board/boards/richie.h
+index a7421d0a..404a248b 100644
+--- a/board/boards/richie.h
++++ b/board/boards/richie.h
+@@ -67,6 +67,10 @@ static void richie_init(void) {
+ 
+   // SPI init
+   gpio_spi_init();
++
++  // nRF UART
++  gpio_uart7_init();
++  uart_init(&uart_ring_som_debug, 115200);
+ }
+ 
+ static harness_configuration richie_harness_config = {
+diff --git a/board/drivers/uart.h b/board/drivers/uart.h
+index aeacf84b..3ccb894c 100644
+--- a/board/drivers/uart.h
++++ b/board/drivers/uart.h
+@@ -108,7 +108,11 @@ bool put_char(uart_ring *q, char elem) {
+ // ************************ High-level debug functions **********************
+ void putch(const char a) {
+   // misra-c2012-17.7: serial debug function, ok to ignore output
++#if defined(RICHIE) && !defined(BOOTSTUB)
++  (void)injectc(&uart_ring_som_debug, a);
++#else
+   (void)injectc(&uart_ring_debug, a);
++#endif
+ }
+ 
+ void print(const char *a) {
+diff --git a/board/stm32h7/lluart.h b/board/stm32h7/lluart.h
+index e18f1e9f..5a5a647e 100644
+--- a/board/stm32h7/lluart.h
++++ b/board/stm32h7/lluart.h
+@@ -44,6 +44,19 @@ void uart_tx_ring(uart_ring *q){
+   EXIT_CRITICAL();
+ }
+ 
++void send_from_rx(uart_ring *q) {
++  ENTER_CRITICAL();
++    char c;
++    if (get_char(q, &c)) {
++      if ((q->uart->ISR & USART_ISR_TXE_TXFNF) != 0U)
++        q->uart->TDR = q->elems_rx[q->r_ptr_rx];   // This clears TXE
++      q->uart->CR1 |= USART_CR1_TXEIE;
++    } else {
++      q->uart->CR1 &= ~USART_CR1_TXEIE;
++    }
++  EXIT_CRITICAL();
++}
++
+ // This read after reading ISR clears all error interrupts. We don't want compiler warnings, nor optimizations
+ #define UART_READ_RDR(uart) volatile uint8_t t = (uart)->RDR; UNUSED(t);
+ 
+@@ -78,7 +91,8 @@ static void uart_interrupt_handler(uart_ring *q) {
+   } else {}
+ 
+   // Send if necessary
+-  uart_tx_ring(q);
++  // uart_tx_ring(q);
++  send_from_rx(q);
+ 
+   EXIT_CRITICAL();
+ }
