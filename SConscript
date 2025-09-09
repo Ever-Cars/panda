@@ -130,7 +130,7 @@ base_project_h7 = {
     "-mcpu=cortex-m7",
     "-mhard-float",
     "-DSTM32H7",
-    "-DSTM32H725xx",
+    "-DSTM32H735xx",
     "-Iboard/stm32h7/inc",
     "-mfpu=fpv5-d16",
   ],
@@ -151,7 +151,7 @@ with open("board/obj/cert.h", "w") as f:
     f.write("\n".join(cert) + "\n")
 
 # panda fw
-build_project("panda_h7", base_project_h7, "./board/main.c", ['-DRICHIE', '-DHW_RICHIE_REV1'])
+build_project("panda_h7", base_project_h7, "./board/main.c", ['-DRICHIE'])
 
 # panda jungle fw
 flags = [
