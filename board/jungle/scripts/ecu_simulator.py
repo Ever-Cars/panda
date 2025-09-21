@@ -4,11 +4,13 @@ import random
 import argparse
 import hexdump
 from panda import PandaJungle
+from opendbc.car.structs import CarParams
 
 DEBUG = False
 VIN = 'SADHD2S17N1618222'
 ids = {
-  0x7e5 : 0x7ea # Jaguar IPace VIN
+  0x7e5 : 0x7ea, # Jaguar IPace VIN
+  0x18da07f1 : 0x18daf107, # 2025 Honda Civic
 }
 
 def dumpPacket(addr, data, bus, pre=''):
@@ -133,7 +135,7 @@ if __name__ == "__main__":
   DEBUG = args.debug
   p = PandaJungle()
   p.can_clear(0xFFFF)
-  p.set_safety_mode(PandaJungle.SAFETY_ALLOUTPUT)
+  p.set_safety_mode(CarParams.SafetyModel.elm327)
   wait_for_request(p)
 
 
