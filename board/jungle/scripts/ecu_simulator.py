@@ -32,10 +32,8 @@ vin_map = [
 ]
 
 def dumpPacket(addr, data, bus, pre=''):
-  if not DEBUG:
-    return
   dump = hexdump.hexdump(data, result='return')
-  print(f'{pre} ({hex(addr)}, {bus}): {dump[10:]}')
+  print(f'{pre:<8} {hex(addr):<10} | {bus:<1}: {dump[10:]}')
 
 # Packet is a tuple of Address (int), Data (bytearray), Bus (int)
 def dumpPackets(p, pre=''):
@@ -100,6 +98,7 @@ def send_vin(dev, packet):
     print(f'Not a VIN request: {packet}')
     return False
 
+  dumpPacket(packet[0], packet[1], packet[2], 'VIN REQ')
   total_sent = 0
   total_to_send = len(VIN) + len(resp)
   # Send first vin frame
@@ -117,12 +116,14 @@ def send_vin(dev, packet):
   d.extend(VIN[:vin_index].encode())
 
   send(dev, resp_id, d, bus)
+  dumpPacket(resp_id, d, bus, 'VIN RESP')
   total_to_send -= vin_index + len(resp)
 
   if not wait_for_continue(dev, kind):
     print(f'Unable to get continue frame')
     return False
   
+  print(f'Sending remaining {total_to_send} VIN bytes')
   # Send the next frames
   frame_num = 1
   while total_to_send > 0:
@@ -132,6 +133,7 @@ def send_vin(dev, packet):
     d = pad_array(d)
 
     send(dev, resp_id, d, bus)
+    dumpPacket(resp_id, d, bus, 'VIN RESP')
     vin_index += 7
     frame_num += 1
     total_to_send -= 7
@@ -143,7 +145,6 @@ def wait_for_request(dev):
 
   packets = recv(dev)
   for p in packets:
-    print(f'Got packet: {p}')
     if send_vin(dev, p):
       return True
       
