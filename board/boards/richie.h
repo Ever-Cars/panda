@@ -6,8 +6,6 @@
 // Richie (Red Panda) + nRF9151  //
 // ///////////////////////////// //
 
-#define NUM_CAN_BUSES 2U
-
 static void richie_enable_can_transceiver(uint8_t transceiver, bool enabled) {
   switch (transceiver) {
     case 1U:

@@ -78,6 +78,10 @@ static uint8_t harness_detect_orientation(void) {
     } else {
       ret = HARNESS_STATUS_NC;
     }
+#ifdef RICHIE
+    // Richie doesn't have proper harness orientation detection, so just assume normal
+    ret = HARNESS_STATUS_NORMAL;
+#endif
 
     // Pins are not 5V tolerant in ADC mode
     set_gpio_mode(current_board->harness_config->GPIO_SBU1, current_board->harness_config->pin_SBU1, MODE_INPUT);
