@@ -14,12 +14,14 @@ if __name__ == "__main__":
   p.set_safety_mode(CarParams.SafetyModel.allOutput)
 
   print("Spamming all buses...")
+  count = 0
   while True:
     at = random.randint(1, 2000)
     st = get_test_string()[0:8]
     bus = random.randint(0, 2)
     try:
       p.can_send(at, st, bus)
+      count += 1
     except usb1.USBErrorTimeout as e:
-      pass
-    # print("Sent message on bus: ", bus)
+      break
+  print(f"Sent {count} messages")

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import os
+import usb1
 import random
 
 from opendbc.car.structs import CarParams
@@ -12,10 +13,15 @@ if __name__ == "__main__":
   p = Panda()
   p.set_safety_mode(CarParams.SafetyModel.allOutput)
 
+  count = 0
   print("Spamming all buses...")
   while True:
     at = random.randint(1, 2000)
     st = get_test_string()[0:8]
     bus = random.randint(0, 2)
-    p.can_send(at, st, bus)
-    # print("Sent message on bus: ", bus)
+    try:
+      p.can_send(at, st, bus)
+      count += 1
+    except usb1.USBErrorTimeout as e:
+      break
+  print(f"Sent {count} messages")
