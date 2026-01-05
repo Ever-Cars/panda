@@ -6,4 +6,3 @@ if __name__ == "__main__":
     pp = PandaJungle(p)
     print(f"{pp.get_serial()[0]}: {pp.get_version()}")
 
-
