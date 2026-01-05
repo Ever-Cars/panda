@@ -29,3 +29,10 @@ void tick_timer_init(void) {
   timer_init(TICK_TIMER, (uint16_t)((15.25*APB2_TIMER_FREQ)/8U));
   NVIC_EnableIRQ(TICK_TIMER_IRQ);
 }
+
+#ifdef GENERATED_CAN_TRAFFIC_TIMER
+void can_spam_timer_init(void) {
+  timer_init(CAN_SPAM_TIMER, 1U); // Will be called 120Mhz/2^16 times per second ~1800Hz
+  NVIC_EnableIRQ(CAN_SPAM_TIMER_IRQ);
+}
+#endif

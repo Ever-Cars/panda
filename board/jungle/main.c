@@ -126,6 +126,33 @@ void tick_handler(void) {
   TICK_TIMER->SR = 0;
 }
 
+#ifdef GENERATED_CAN_TRAFFIC_TIMER
+void can_spam_handler(void) {
+  if (CAN_SPAM_TIMER->SR != 0U) {
+    if (generated_can_traffic) {
+      can_ring *qs[] = {&can_tx1_q, &can_tx2_q, &can_tx3_q};
+      // fill up all the queues
+      for (int j = 0; j < 3; j++) {
+        for (int i = 0; i < 2; i++) {
+          if (can_slots_empty(qs[j]) == 0) continue;
+          CANPacket_t to_send;
+          to_send.returned = 0U;
+          to_send.rejected = 0U;
+          to_send.extended = 0U;
+          to_send.addr = 0x130U + j;
+          to_send.bus = j % 3U;
+          to_send.data_len_code = 8U;
+          (void)memcpy(to_send.data, "\x08\xff\xff\xff\xff\xff\xff\xff", dlc_to_len[to_send.data_len_code]);
+          can_set_checksum(&to_send);
+
+          can_send(&to_send, to_send.bus, true);
+        }
+      }
+    }
+  }
+  CAN_SPAM_TIMER->SR = 0;
+}
+#endif
 
 int main(void) {
   // Init interrupt table
@@ -162,6 +189,10 @@ int main(void) {
   // 8Hz timer
   REGISTER_INTERRUPT(TICK_TIMER_IRQ, tick_handler, 10U, FAULT_INTERRUPT_RATE_TICK)
   tick_timer_init();
+#ifdef GENERATED_CAN_TRAFFIC_TIMER
+  REGISTER_INTERRUPT(CAN_SPAM_TIMER_IRQ, can_spam_handler, 2000U, FAULT_INTERRUPT_RATE_TICK)
+  can_spam_timer_init();
+#endif
 
 #ifdef DEBUG
   print("DEBUG ENABLED\n");
@@ -190,6 +221,7 @@ int main(void) {
   // LED should keep on blinking all the time
   uint32_t cnt = 0;
   for (cnt=0;;cnt++) {
+  #ifndef GENERATED_CAN_TRAFFIC_TIMER
     if (generated_can_traffic) {
       // fill up all the queues
       can_ring *qs[] = {&can_tx1_q, &can_tx2_q, &can_tx3_q};
@@ -213,6 +245,7 @@ int main(void) {
       delay(1000);
       continue;
     }
+  #endif
 
     // useful for debugging, fade breaks = panda is overloaded
     for (uint32_t fade = 0U; fade < MAX_LED_FADE; fade += 1U) {
