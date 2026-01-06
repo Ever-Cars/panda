@@ -144,6 +144,14 @@ int comms_control_handler(ControlPacket_t *req, uint8_t *resp) {
       resp[0] = current_board->read_som_gpio();
       resp_len = 1;
       break;
+    // **** 0xc7: get emtpy slots in CAN RX buffer
+    case 0xc7:
+      // Max length fits in 2 bytes
+      uint32_t slots = can_slots_empty(&can_rx_q);
+      resp[0] = slots & 0xFFU;
+      resp[1] = (slots >> 8U) & 0xFFU;
+      resp_len = 2U;
+      break;
     // **** 0xd0: fetch serial (aka the provisioned dongle ID)
     case 0xd0:
       // addresses are OTP

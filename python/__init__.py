@@ -742,6 +742,16 @@ class Panda:
 
     """
     self._handle.controlWrite(Panda.REQUEST_OUT, 0xf1, bus, 0, b'')
+  
+  def get_can_rx_slots(self):
+    """Returns the number of empty RX slots in the internal CAN ringbuffer.
+
+    Returns:
+      int: number of empty RX slots.
+    """
+    dat = self._handle.controlRead(Panda.REQUEST_IN, 0xc7, 0, 0, 2)
+    print(dat)
+    return struct.unpack("H", dat)[0]
 
   # ******************* serial *******************
 
