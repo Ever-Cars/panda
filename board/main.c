@@ -26,11 +26,11 @@
 #include "board/main_comms.h"
 
 #ifdef HW_RICHIE_REV1
-  #define BOARD_NAME "Richie Rev 1"
+  #define BOARD_NAME "RICHIE REV 1"
 #elif defined(RICHIE)
-  #define BOARD_NAME "Richie"
+  #define BOARD_NAME "RICHIE"
 #else
-  #define BOARD_NAME "Panda"
+  #define BOARD_NAME "PANDA"
 #endif
 
 // ********************* Serial debugging *********************
