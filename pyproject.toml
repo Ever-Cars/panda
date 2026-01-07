@@ -22,6 +22,7 @@ dev = [
   "pycryptodome >= 3.9.8",
   "cffi",
   "flaky",
+  "prettytable",
   "pytest",
   "pytest-mock",
   "pytest-timeout",
