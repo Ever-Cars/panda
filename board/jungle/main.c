@@ -128,6 +128,7 @@ void tick_handler(void) {
 
 #ifdef GENERATED_CAN_TRAFFIC_TIMER
 void can_spam_handler(void) {
+  static uint32_t count = 1;
   if (CAN_SPAM_TIMER->SR != 0U) {
     if (generated_can_traffic) {
       can_ring *qs[] = {&can_tx1_q, &can_tx2_q, &can_tx3_q};
@@ -143,9 +144,11 @@ void can_spam_handler(void) {
           to_send.bus = j % 3U;
           to_send.data_len_code = 8U;
           (void)memcpy(to_send.data, "\x08\xff\xff\xff\xff\xff\xff\xff", dlc_to_len[to_send.data_len_code]);
+          (void)memcpy(&to_send.data[1], &count, sizeof(count));
           can_set_checksum(&to_send);
 
           can_send(&to_send, to_send.bus, true);
+          count++;
         }
       }
     }
