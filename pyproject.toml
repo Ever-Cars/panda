@@ -13,7 +13,7 @@ classifiers = [
 ]
 dependencies = [
   "libusb1",
-  "opendbc @ git+git@github.com:Ever-Cars/opendbc.git@polar-bear#egg=opendbc",
+  "opendbc @ git+ssh://git@github.com/Ever-Cars/opendbc.git@polar-bear#egg=opendbc",
 ]
 
 [project.optional-dependencies]
