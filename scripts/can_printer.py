@@ -36,7 +36,7 @@ def can_printer():
 
     if sec_since_boot() - lp > 0.1:
       dd = chr(27) + "[2J"
-      dd += "%5.2f\n" % (sec_since_boot() - start)
+      dd += "Uptime: %5.2f - Count: %d\n" % (sec_since_boot() - start, len(all_msgs))
       for (addr, bus), dat_log in sorted(all_msgs.items()):
         dd += "%d: %s(%6d): %s\n" % (bus, "%04X(%4d)" % (addr, addr), len(dat_log), binascii.hexlify(dat_log[-1]).decode())
       print(dd)
