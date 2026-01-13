@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-
 import csv
 import time
 from panda import Panda
+from opendbc.car.structs import CarParams
 
 def can_logger():
   p = Panda()
+  p.set_safety_mode(CarParams.SafetyModel.allOutput)
 
   try:
     outputfile = open('output.csv', 'w')
