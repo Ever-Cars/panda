@@ -123,4 +123,8 @@ void llspi_init(void) {
   NVIC_EnableIRQ(DMA2_Stream2_IRQn);
   NVIC_EnableIRQ(DMA2_Stream3_IRQn);
   NVIC_EnableIRQ(SPI4_IRQn);
+  // Set priorities before FDCAN to avoid a noisy CAN blocking SPI
+  NVIC_SetPriority(DMA2_Stream2_IRQn, 23);
+  NVIC_SetPriority(DMA2_Stream3_IRQn, 24);
+  NVIC_SetPriority(SPI4_IRQn, 25);
 }
