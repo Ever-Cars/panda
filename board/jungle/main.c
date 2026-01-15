@@ -144,7 +144,10 @@ void can_spam_handler(void) {
           to_send.bus = j % 3U;
           to_send.data_len_code = 8U;
           (void)memcpy(to_send.data, "\x08\xff\xff\xff\xff\xff\xff\xff", dlc_to_len[to_send.data_len_code]);
-          (void)memcpy(&to_send.data[1], &count, sizeof(count));
+          to_send.data[1] = (count >> 24) & 0xFF;
+          to_send.data[2] = (count >> 16) & 0xFF;
+          to_send.data[3] = (count >> 8) & 0xFF;
+          to_send.data[4] = count & 0xFF;
           can_set_checksum(&to_send);
 
           can_send(&to_send, to_send.bus, true);
