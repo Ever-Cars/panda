@@ -15,7 +15,7 @@ dist/
 build/
 pandacan.egg-info/
 obj/
-examples/output.csv
+*.csv
 .DS_Store
 .vscode*
 nosetests.xml
