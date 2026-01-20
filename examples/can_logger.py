@@ -37,7 +37,9 @@ def can_logger():
         print(f"Message Counts... Bus 0: {bus0_msg_cnt} Bus 1: {bus1_msg_cnt} Bus 2: {bus2_msg_cnt}", end='\r')
 
   except KeyboardInterrupt:
+    slots = p.get_can_rx_slots()
     print(f"\nNow exiting. Final message Counts... Bus 0: {bus0_msg_cnt} Bus 1: {bus1_msg_cnt} Bus 2: {bus2_msg_cnt}")
+    print(f"RX slots: {slots}")
     outputfile.close()
 
 if __name__ == "__main__":
