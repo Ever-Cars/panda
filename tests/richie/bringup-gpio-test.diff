@@ -1,8 +1,37 @@
+diff --git a/SConscript b/SConscript
+index e0233760..6e6b0a58 100644
+--- a/SConscript
++++ b/SConscript
+@@ -151,7 +151,7 @@ with open("board/obj/cert.h", "w") as f:
+     f.write("\n".join(cert) + "\n")
+ 
+ # panda fw
+-build_project("panda_h7", base_project_h7, "./board/main.c", ['-DRICHIE'])
++build_project("panda_h7", base_project_h7, "./board/main.c", ['-DRICHIE', '-DRICHIE_DEBUG'])
+ 
+ # panda jungle fw
+ flags = [
+diff --git a/board/boards/richie.h b/board/boards/richie.h
+index dd4bfa61..8e59cc65 100644
+--- a/board/boards/richie.h
++++ b/board/boards/richie.h
+@@ -58,8 +58,9 @@ static void richie_init(void) {
+ 
+   // A3, A5, B13: nRF9151 gpios
+   // A3 will be used to synchronize SPI communication
+-  set_gpio_pullup(GPIOA, 3, PULL_NONE);
+-  set_gpio_mode(GPIOA, 3, MODE_OUTPUT);
++  // set_gpio_pullup(GPIOA, 3, PULL_NONE);
++  // set_gpio_mode(GPIOA, 3, MODE_OUTPUT);
++  set_gpio_mode(GPIOA, 3, MODE_INPUT);
+   set_gpio_mode(GPIOA, 5, MODE_INPUT);
+   set_gpio_mode(GPIOB, 13, MODE_INPUT);
+ 
 diff --git a/board/main.c b/board/main.c
-index 1e2c80b0..85a954bd 100644
+index db56bc2f..9db83834 100644
 --- a/board/main.c
 +++ b/board/main.c
-@@ -349,6 +349,16 @@ int main(void) {
+@@ -352,6 +352,16 @@ int main(void) {
    print("**** INTERRUPTS ON ****\n");
    enable_interrupts();
  
@@ -11,15 +40,15 @@ index 1e2c80b0..85a954bd 100644
 +  int gpio1 = get_gpio_input(GPIOB, 13);
 +  int gpio2 = get_gpio_input(GPIOA, 3);
 +  int gpio3 = get_gpio_input(GPIOA, 5);
-+  print("GPIO1: "); puth(gpio1); 
-+  print("\nGPIO2: "); puth(gpio2); 
-+  print("\nGPIO3: "); puth(gpio3); print("\n");
++  print("GPIO1: "); puthx(gpio1, 1);
++  print("\nGPIO2: "); puthx(gpio2, 1);
++  print("\nGPIO3: "); puthx(gpio3, 1); print("\n");
 +#endif
 +
    // LED should keep on blinking all the time
    while (true) {
      if (power_save_status == POWER_SAVE_STATUS_DISABLED) {
-@@ -370,6 +380,25 @@ int main(void) {
+@@ -373,6 +383,25 @@ int main(void) {
            delay((MAX_LED_FADE - fade) >> 4);
          }
  
@@ -28,86 +57,76 @@ index 1e2c80b0..85a954bd 100644
 +        int tmp = get_gpio_input(GPIOB, 13);
 +        if (tmp != gpio1) {
 +          gpio1 = tmp;
-+          print("GPIO1: "); puth(gpio1); print("\n");
++          print("GPIO1: "); puthx(gpio1, 1); print("\n");
 +        }
 +        tmp = get_gpio_input(GPIOA, 3);
 +        if (tmp != gpio2) {
 +          gpio2 = tmp;
-+          print("GPIO2: "); puth(gpio1); print("\n");
++          print("GPIO2: "); puthx(gpio2, 1); print("\n");
 +        }
 +        tmp = get_gpio_input(GPIOA, 5);
 +        if (tmp != gpio3) {
 +          gpio3 = tmp;
-+          print("GPIO3: "); puth(gpio1); print("\n");
++          print("GPIO3: "); puthx(gpio3, 1); print("\n");
 +        }
 +      #endif
 +
        #ifdef DEBUG_FAULTS
        } else {
            led_set(LED_RED, 1);
-diff --git a/tests/richie/bringup-gpio-test.diff b/tests/richie/bringup-gpio-test.diff
-index 75bbdf69..e69de29b 100644
---- a/tests/richie/bringup-gpio-test.diff
-+++ b/tests/richie/bringup-gpio-test.diff
-@@ -1,61 +0,0 @@
--diff --git a/board/SConscript b/board/SConscript
--index 949f1b4d..a14c73ce 100644
----- a/board/SConscript
--+++ b/board/SConscript
--@@ -12,7 +12,8 @@ for project_name, project in build_projects.items():
--   flags = [
--     "-DPANDA",
--     "-DRICHIE",
---    "-DHW_RICHIE_REV1"
--+    "-DHW_RICHIE_REV1",
--+    "-DRICHIE_DEBUG",  # Enable debug features
--   ]
--   if ("ENABLE_SPI" in os.environ or "h7" in project_name):
--     flags.append('-DENABLE_SPI')
--diff --git a/board/main.c b/board/main.c
--index 31e713d4..b53094ce 100644
----- a/board/main.c
--+++ b/board/main.c
--@@ -366,6 +366,16 @@ int main(void) {
--   print("**** INTERRUPTS ON ****\n");
--   enable_interrupts();
-- 
--+#ifdef RICHIE_DEBUG
--+  // Read GPIO lines
--+  int gpio1 = get_gpio_input(GPIOB, 13);
--+  int gpio2 = get_gpio_input(GPIOA, 3);
--+  int gpio3 = get_gpio_input(GPIOA, 5);
--+  print("GPIO1: "); puth(gpio1); 
--+  print("\nGPIO2: "); puth(gpio2); 
--+  print("\nGPIO3: "); puth(gpio3); print("\n");
--+#endif
--+
--   // LED should keep on blinking all the time
--   while (true) {
--     if (power_save_status == POWER_SAVE_STATUS_DISABLED) {
--@@ -387,6 +397,25 @@ int main(void) {
--           delay((MAX_LED_FADE - fade) >> 4);
--         }
-- 
--+      #ifdef RICHIE_DEBUG
--+        // Check if debug gpios have toggled
--+        int tmp = get_gpio_input(GPIOB, 13);
--+        if (tmp != gpio1) {
--+          gpio1 = tmp;
--+          print("GPIO1: "); puth(gpio1); print("\n");
--+        }
--+        tmp = get_gpio_input(GPIOA, 3);
--+        if (tmp != gpio2) {
--+          gpio2 = tmp;
--+          print("GPIO2: "); puth(gpio1); print("\n");
--+        }
--+        tmp = get_gpio_input(GPIOA, 5);
--+        if (tmp != gpio3) {
--+          gpio3 = tmp;
--+          print("GPIO3: "); puth(gpio1); print("\n");
--+        }
--+      #endif
--+
--       #ifdef DEBUG_FAULTS
--       } else {
--          led_set(LED_RED, 1);
+diff --git a/board/stm32h7/llspi.h b/board/stm32h7/llspi.h
+index fd61e322..d58617aa 100644
+--- a/board/stm32h7/llspi.h
++++ b/board/stm32h7/llspi.h
+@@ -51,9 +51,9 @@ void llspi_miso_dma(uint8_t *addr, int len) {
+ static bool spi_tx_dma_done = false;
+ // master -> panda DMA finished
+ static void DMA2_Stream2_IRQ_Handler(void) {
+-#ifdef RICHIE
+-  set_gpio_output(GPIOA, 3, true);
+-#endif
++// #ifdef RICHIE
++//   set_gpio_output(GPIOA, 3, true);
++// #endif
+   // Clear interrupt flag
+   DMA2->LIFCR = DMA_LIFCR_CTCIF2;
+ 
+@@ -64,9 +64,9 @@ static void DMA2_Stream2_IRQ_Handler(void) {
+     // all data received
+     spi_rx_done();
+   }
+-#ifdef RICHIE
+-  set_gpio_output(GPIOA, 3, false);
+-#endif
++// #ifdef RICHIE
++//   set_gpio_output(GPIOA, 3, false);
++// #endif
+ }
+ 
+ // panda -> master DMA finished
+@@ -81,9 +81,9 @@ static void DMA2_Stream3_IRQ_Handler(void) {
+ 
+ // panda TX finished
+ static void SPI4_IRQ_Handler(void) {
+-#ifdef RICHIE
+-  set_gpio_output(GPIOA, 3, true);
+-#endif
++// #ifdef RICHIE
++//   set_gpio_output(GPIOA, 3, true);
++// #endif
+   // clear flag
+   SPI4->IFCR |= (0x1FFU << 3U);
+ 
+@@ -91,9 +91,9 @@ static void SPI4_IRQ_Handler(void) {
+     spi_tx_dma_done = false;
+     spi_tx_done(false);
+   }
+-#ifdef RICHIE
+-  set_gpio_output(GPIOA, 3, false);
+-#endif
++// #ifdef RICHIE
++//   set_gpio_output(GPIOA, 3, false);
++// #endif
+ }
+ 
+ 
