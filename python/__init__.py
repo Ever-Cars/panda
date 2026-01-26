@@ -750,7 +750,6 @@ class Panda:
       int: number of empty RX slots.
     """
     dat = self._handle.controlRead(Panda.REQUEST_IN, 0xc7, 0, 0, 2)
-    print(dat)
     return struct.unpack("H", dat)[0]
 
   # ******************* serial *******************
