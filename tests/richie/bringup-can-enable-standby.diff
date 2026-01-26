@@ -1,0 +1,39 @@
+diff --git a/board/main_comms.h b/board/main_comms.h
+index afc90106..29c0d295 100644
+--- a/board/main_comms.h
++++ b/board/main_comms.h
+@@ -303,6 +303,18 @@ int comms_control_handler(ControlPacket_t *req, uint8_t *resp) {
+         heartbeat_engaged = (req->param1 == 1U);
+         break;
+       }
++    // **** 0xf4: Set CAN transceiver enable/disable
++    case 0xf4:
++      if (req->param1 == 1U) {
++        set_gpio_output(GPIOB, 7, !req->param2); // Enable CAN1 Pin
++      } else if (req->param1 == 2U) {
++        set_gpio_output(GPIOB, 4, !req->param2); // Enable CAN2 Pin
++      } else if (req->param1 == 3U) {
++        set_gpio_output(GPIOB, 2, !req->param2); // Standby CAN1 Pin
++      } else if (req->param1 == 4U) {
++        set_gpio_output(GPIOB, 3, !req->param2); // Standby CAN2 Pin
++      }
++      break;
+     // **** 0xf6: set siren enabled
+     case 0xf6:
+       siren_enabled = (req->param1 != 0U);
+diff --git a/examples/can_logger.py b/examples/can_logger.py
+index b543bac7..2f37cd6b 100755
+--- a/examples/can_logger.py
++++ b/examples/can_logger.py
+@@ -7,6 +7,11 @@ from opendbc.car.structs import CarParams
+ def can_logger():
+   p = Panda()
+   p.set_safety_mode(CarParams.SafetyModel.allOutput)
++  p.set_can_enable(1, True)
++  p.set_can_enable(2, True)
++  p.can_clear(0)
++  p.can_clear(1)
++  p.can_clear(2)
+ 
+   try:
+     outputfile = open('output.csv', 'w')
