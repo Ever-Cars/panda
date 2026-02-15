@@ -13,7 +13,7 @@ classifiers = [
 ]
 dependencies = [
   "libusb1",
-  "opendbc @ git+ssh://git@github.com/Ever-Cars/opendbc.git@polar-bear#egg=opendbc",
+  "opendbc @ git+https://github.com/Ever-Cars/opendbc.git@polar-bear#egg=opendbc",
 ]
 
 [project.optional-dependencies]
@@ -22,7 +22,6 @@ dev = [
   "pycryptodome >= 3.9.8",
   "cffi",
   "flaky",
-  "prettytable",
   "pytest",
   "pytest-mock",
   "pytest-timeout",
