@@ -112,11 +112,10 @@ class Panda:
 
   # from https://github.com/commaai/openpilot/blob/103b4df18cbc38f4129555ab8b15824d1a672bdf/cereal/log.capnp#L648
   HW_TYPE_UNKNOWN = b'\x00'
-  HW_TYPE_WHITE = b'\x01'
-  HW_TYPE_BLACK = b'\x03'
   HW_TYPE_RED_PANDA = b'\x07'
   HW_TYPE_TRES = b'\x09'
   HW_TYPE_CUATRO = b'\x0a'
+  HW_TYPE_BODY = b'\xb1'
 
   CAN_PACKET_VERSION = 4
   HEALTH_PACKET_VERSION = 17
@@ -124,15 +123,10 @@ class Panda:
   HEALTH_STRUCT = struct.Struct("<IIIIIIIIBBBBBHBBBHfBBHHHB")
   CAN_HEALTH_STRUCT = struct.Struct("<BIBBBBBBBBIIIIIIIHHBBBIIII")
 
-  H7_DEVICES = [HW_TYPE_RED_PANDA, HW_TYPE_TRES, HW_TYPE_CUATRO]
+  H7_DEVICES = [HW_TYPE_RED_PANDA, HW_TYPE_TRES, HW_TYPE_CUATRO, HW_TYPE_BODY]
   SUPPORTED_DEVICES = H7_DEVICES
 
   INTERNAL_DEVICES = (HW_TYPE_TRES, HW_TYPE_CUATRO)
-
-  MAX_FAN_RPMs = {
-    HW_TYPE_TRES: 6600,
-    HW_TYPE_CUATRO: 5000,
-  }
 
   HARNESS_STATUS_NC = 0
   HARNESS_STATUS_NORMAL = 1
@@ -147,11 +141,10 @@ class Panda:
     self._can_speed_kbps = can_speed_kbps
 
     if cli and serial is None:
-        self._connect_serial = self._cli_select_panda()
+      self._connect_serial = self._cli_select_panda()
     else:
-        self._connect_serial = serial
+      self._connect_serial = serial
 
-    # connect and set mcu type
     self.connect(claim)
 
   def _cli_select_panda(self):
@@ -208,13 +201,8 @@ class Panda:
     self._serial = serial
     self._connect_serial = serial
     self._handle_open = True
-    self._mcu_type = self.get_mcu_type()
     self.health_version, self.can_version, self.can_health_version = self.get_packets_versions()
     logger.debug("connected")
-
-    hw_type = self.get_type()
-    if hw_type not in self.SUPPORTED_DEVICES:
-      print("WARNING: Using deprecated HW")
 
     # disable openpilot's heartbeat checks
     if self._disable_checks:
@@ -286,7 +274,7 @@ class Panda:
             handle = device.open()
             if sys.platform not in ("win32", "cygwin", "msys", "darwin"):
               handle.setAutoDetachKernelDriver(True)
-            if claim:
+            if claim or sys.platform == "darwin":
               handle.claimInterface(0)
               # handle.setInterfaceAltSetting(0, 0)  # Issue in USB stack
 
@@ -342,6 +330,9 @@ class Panda:
     return []
 
   def reset(self, enter_bootstub=False, enter_bootloader=False, reconnect=True):
+    if enter_bootstub or enter_bootloader:
+      assert (hw_type := self.get_type()) in self.SUPPORTED_DEVICES, f"Unknown HW: {hw_type}"
+
     # no response is expected since it resets right away
     timeout = 5000 if isinstance(self._handle, PandaSpiHandle) else 15000
     try:
@@ -421,16 +412,14 @@ class Panda:
       pass
 
   def flash(self, fn=None, code=None, reconnect=True):
+    assert (hw_type := self.get_type()) in self.SUPPORTED_DEVICES, f"Unknown HW: {hw_type}"
+
     if self.up_to_date(fn=fn):
       logger.info("flash: already up to date")
       return
 
-    hw_type = self.get_type()
-    if hw_type not in self.SUPPORTED_DEVICES:
-      raise RuntimeError(f"HW type {hw_type.hex()} is deprecated and can no longer be flashed.")
-
     if not fn:
-      fn = os.path.join(FW_PATH, self._mcu_type.config.app_fn)
+      fn = os.path.join(FW_PATH, McuType.H7.config.app_fn)
     assert os.path.isfile(fn)
     logger.debug("flash: main version is %s", self.get_version())
     if not self.bootstub:
@@ -445,7 +434,7 @@ class Panda:
     logger.debug("flash: bootstub version is %s", self.get_version())
 
     # do flash
-    Panda.flash_static(self._handle, code, mcu_type=self._mcu_type)
+    Panda.flash_static(self._handle, code, mcu_type=McuType.H7)
 
     # reconnect
     if reconnect:
@@ -496,7 +485,7 @@ class Panda:
   def up_to_date(self, fn=None) -> bool:
     current = self.get_signature()
     if fn is None:
-      fn = os.path.join(FW_PATH, self.get_mcu_type().config.app_fn)
+      fn = os.path.join(FW_PATH, McuType.H7.config.app_fn)
     expected = Panda.get_signature_from_firmware(fn)
     return (current == expected)
 
@@ -608,12 +597,6 @@ class Panda:
     else:
       return (0, 0, 0)
 
-  def get_mcu_type(self) -> McuType:
-    hw_type = self.get_type()
-    if hw_type in Panda.H7_DEVICES:
-      return McuType.H7
-    raise ValueError(f"unknown HW type: {hw_type}")
-
   def is_internal(self):
     return self.get_type() in Panda.INTERNAL_DEVICES
 
@@ -634,7 +617,7 @@ class Panda:
     return self._serial
 
   def get_dfu_serial(self):
-    return PandaDFU.st_serial_to_dfu_serial(self._serial, self._mcu_type)
+    return PandaDFU.st_serial_to_dfu_serial(self._serial, McuType.H7)
 
   def get_uid(self):
     """

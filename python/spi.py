@@ -1,6 +1,5 @@
 import binascii
 import os
-import fcntl
 import math
 import time
 import struct
@@ -12,6 +11,13 @@ from .base import BaseHandle, BaseSTBootloaderHandle, TIMEOUT
 from .constants import McuType, MCU_TYPE_BY_IDCODE, USBPACKET_MAX_SIZE
 from .utils import logger
 
+# No fcntl on Windows
+try:
+  import fcntl
+except ImportError:
+  fcntl = None # type: ignore
+
+# No spidev on MacOS/Windows
 try:
   import spidev
 except ImportError:
@@ -117,6 +123,7 @@ class PandaSpiHandle(BaseHandle):
 
   def __init__(self) -> None:
     self.dev = SpiDevice()
+    self.no_retry = "NO_RETRY" in os.environ
 
   # helpers
   def _calc_checksum(self, data: bytes) -> int:
@@ -193,6 +200,8 @@ class PandaSpiHandle(BaseHandle):
         except PandaSpiException as e:
           exc = e
           logger.debug("SPI transfer failed, retrying", exc_info=True)
+          if self.no_retry:
+            break
 
           # ensure slave is in a consistent state and ready for the next transfer
           # (e.g. slave TX buffer isn't stuck full)
