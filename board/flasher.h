@@ -7,8 +7,6 @@
 uint32_t *prog_ptr = NULL;
 bool unlocked = false;
 
-void spi_init(void);
-
 #ifdef BOOTSTUB_DEBUG
 void debug_ring_callback(uart_ring *ring) {
   UNUSED(ring);
