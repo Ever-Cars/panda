@@ -177,6 +177,10 @@ void soft_flasher_start(void) {
   if (current_board->has_spi) {
     gpio_spi_init();
     spi_init();
+  #ifdef RICHIE
+    set_gpio_pullup(GPIOA, 3, PULL_NONE);
+    set_gpio_mode(GPIOA, 3, MODE_OUTPUT);
+  #endif
     print("SPI initialized\n");
   }
 
