@@ -31,7 +31,7 @@ void putch(const char a);
 void print(const char *a);
 void puthx(uint32_t i, uint8_t len);
 void puth(unsigned int i);
-#if defined(DEBUG_SPI) || defined(BOOTSTUB) || defined(DEBUG)
+#if defined(DEBUG_SPI) || defined(DEBUG)
 static void puth4(unsigned int i);
 #endif
 #if defined(DEBUG_SPI) || defined(DEBUG_USB) || defined(DEBUG_COMMS)
