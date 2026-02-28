@@ -13,6 +13,7 @@ classifiers = [
 ]
 dependencies = [
   "libusb1",
+  "libusb-package",
   "opendbc @ git+ssh://git@github.com/Ever-Cars/opendbc.git@polar-bear#egg=opendbc",
 
   # runtime dependency on comma four
