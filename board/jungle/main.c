@@ -102,8 +102,9 @@ void tick_handler(void) {
 
 #ifdef GENERATED_CAN_TRAFFIC_TIMER
 void can_spam_handler(void) {
-  static uint32_t count = 1;
+  static uint32_t count = 0;
   static uint32_t start_time = 0U;
+  static uint32_t skipped = 0U;
   if (CAN_SPAM_TIMER->SR != 0U) {
     if (generated_can_traffic) {
       if (start_time == 0U) {
@@ -111,9 +112,12 @@ void can_spam_handler(void) {
       }
       can_ring *qs[] = {&can_tx1_q, &can_tx2_q, &can_tx3_q};
       // fill up all the queues
-      for (int j = 0; j < 3; j++) {
-        for (int i = 0; i < 2; i++) {
-          if (can_slots_empty(qs[j]) == 0) continue;
+      for (int j = 1; j < 3; j++) {
+        if (can_slots_empty(qs[j]) == 0) {
+          skipped++;
+          continue;
+        }
+        for (int i = 0; i < 4; i++) { // Num packets per interrupt
           CANPacket_t to_send;
           to_send.returned = 0U;
           to_send.rejected = 0U;
@@ -134,8 +138,10 @@ void can_spam_handler(void) {
       }
       if (microsecond_timer_get() - start_time > 1000000U) {
         start_time = microsecond_timer_get();
-        puth(count); print(" packet generated\n");
+        puth(count); print(" packets generated\n");
+        puth(skipped); print(" packets skipped\n");
         count = 0;
+        skipped = 0;
       }
     }
   }
