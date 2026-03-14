@@ -56,14 +56,8 @@ static void DMA2_Stream2_IRQ_Handler(void) {
 #endif
   // Clear interrupt flag
   DMA2->LIFCR = DMA_LIFCR_CTCIF2;
-
-  if ((SPI4->SR & SPI_SR_TXC) == 0U) {
-    // TX FIFO is not empty, restart transfer
-    spi_tx_done(true);
-  } else {
-    // all data received
-    spi_rx_done();
-  }
+  // all data received
+  spi_rx_done();
 #ifdef RICHIE
   set_gpio_output(GPIOA, 3, false);
 #endif
@@ -111,11 +105,10 @@ void llspi_init(void) {
   register_set(&(DMAMUX1_Channel11->CCR), 84U, 0xFFFFFFFFU);
   register_set(&(DMA2_Stream3->CR), (DMA_SxCR_MINC | DMA_SxCR_DIR_0 | DMA_SxCR_TCIE), 0x1E077EFEU);
   register_set(&(DMA2_Stream3->PAR), (uint32_t)&(SPI4->TXDR), 0xFFFFFFFFU);
-  register_set(&(DMA2_Stream3->FCR), (DMA_SxFCR_DMDIS | DMA_SxFCR_FTH_0), 0x87U); // Set FIFO mode, 1/2 full threshold
 
   // Enable SPI
   register_set(&(SPI4->IER), 0, 0x3FFU);
-  register_set(&(SPI4->CFG1), (SPI_CFG1_DSIZE_0 | SPI_CFG1_DSIZE_1 | SPI_CFG1_DSIZE_2 | SPI_CFG1_UDRDET_0), 0x181FU);
+  register_set(&(SPI4->CFG1), (7U << SPI_CFG1_DSIZE_Pos), SPI_CFG1_DSIZE_Msk);
   register_set(&(SPI4->UDRDR), 0xcd, 0xFFFFU);  // set under-run value for debugging
   register_set(&(SPI4->CR1), SPI_CR1_SPE, 0xFFFFU);
   register_set(&(SPI4->CR2), 0, 0xFFFFU);
