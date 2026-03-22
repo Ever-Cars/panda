@@ -223,6 +223,14 @@ int comms_control_handler(ControlPacket_t *req, uint8_t *resp) {
       (void)memcpy(resp, gitversion, sizeof(gitversion));
       resp_len = sizeof(gitversion) - 1U;
       break;
+    // **** 0xd7: get panda version
+    case 0xd7:
+      COMPILE_TIME_ASSERT(sizeof(pandaversion) <= USBPACKET_MAX_SIZE);
+      resp[0] = VERSION_MAJOR;
+      resp[1] = VERSION_MINOR;
+      resp[2] = VERSION_PATCH;
+      resp_len = 3;
+      break;
     // **** 0xd8: reset ST
     case 0xd8:
       NVIC_SystemReset();
