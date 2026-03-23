@@ -2,7 +2,7 @@
 import argparse
 from tqdm import tqdm
 from opendbc.car.carlog import carlog
-from opendbc.car.uds import UdsClient, MessageTimeoutError, NegativeResponseError, InvalidSubAddressError, \
+from panda.python.uds import UdsClient, MessageTimeoutError, NegativeResponseError, InvalidSubAddressError, \
                             SESSION_TYPE, DATA_IDENTIFIER_TYPE
 from opendbc.car.structs import CarParams
 from panda import Panda

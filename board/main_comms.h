@@ -108,6 +108,7 @@ int comms_control_handler(ControlPacket_t *req, uint8_t *resp) {
     // **** 0xc0: reset communications state
     case 0xc0:
       comms_can_reset();
+      comms_isotp_reset();
       break;
     // **** 0xc1: get hardware type
     case 0xc1:
@@ -262,6 +263,35 @@ int comms_control_handler(ControlPacket_t *req, uint8_t *resp) {
         ++resp_len;
       }
       break;
+    // **** 0xea: set ISO-TP bus
+    case 0xea:
+      if ((req->length == 0U) &&
+          (req->param2 == 0U) &&
+          ((req->param1 & 0xFF00U) == 0U) &&
+          (req->param1 < PANDA_CAN_CNT)) {
+        isotp_set_bus((uint8_t)req->param1);
+      }
+      break;
+    // **** 0xeb: set ISO-TP TX arbitration ID
+    case 0xeb:
+      if (req->length == 0U) {
+        (void)isotp_set_tx_arb_id(((uint32_t)req->param2 << 16U) | req->param1);
+      }
+      break;
+    // **** 0xec: set ISO-TP RX arbitration ID
+    case 0xec:
+      if (req->length == 0U) {
+        (void)isotp_set_rx_arb_id(((uint32_t)req->param2 << 16U) | req->param1);
+      }
+      break;
+    // **** 0xed: set ISO-TP extended addressing
+    case 0xed:
+      if ((req->length == 0U) &&
+          ((req->param1 & 0xFE00U) == 0U) &&
+          ((req->param2 & 0xFE00U) == 0U)) {
+        isotp_set_ext_addr(req->param1, req->param2);
+      }
+      break;
     // **** 0xe5: set CAN loopback (for testing)
     case 0xe5:
       can_loopback = req->param1 > 0U;
@@ -278,6 +308,14 @@ int comms_control_handler(ControlPacket_t *req, uint8_t *resp) {
     // **** 0xe8: set can-fd auto swithing mode
     case 0xe8:
       bus_config[req->param1].canfd_auto = req->param2 > 0U;
+      break;
+    // **** 0xee: set ISO-TP TX timeouts
+    case 0xee:
+      if ((req->length == 0U) &&
+          (req->param1 != 0U) &&
+          (req->param2 != 0U)) {
+        isotp_set_tx_timeouts(req->param1, req->param2);
+      }
       break;
     // **** 0xf1: Clear CAN ring buffer.
     case 0xf1:
