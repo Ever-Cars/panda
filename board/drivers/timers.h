@@ -5,6 +5,15 @@ static void timer_init(TIM_TypeDef *TIM, int psc) {
   TIM->SR = 0;
 }
 
+static void timer_init_with_arr(TIM_TypeDef *TIM, uint32_t psc, uint32_t arr) {
+  register_set(&(TIM->PSC), (psc - 1U), 0xFFFFU);
+  register_set(&(TIM->ARR), arr, 0xFFFFFFFFU);
+  TIM->EGR = TIM_EGR_UG;
+  register_set(&(TIM->DIER), TIM_DIER_UIE, 0x5F5FU);
+  register_set(&(TIM->CR1), TIM_CR1_CEN, 0x3FU);
+  TIM->SR = 0U;
+}
+
 void microsecond_timer_init(void) {
   MICROSECOND_TIMER->PSC = (APB1_TIMER_FREQ - 1U);
   MICROSECOND_TIMER->CR1 = TIM_CR1_CEN;
@@ -36,3 +45,8 @@ void can_spam_timer_init(void) {
   NVIC_EnableIRQ(CAN_SPAM_TIMER_IRQ);
 }
 #endif
+
+void isotp_timer_init(void) {
+  timer_init_with_arr(ISOTP_TIMER, APB1_TIMER_FREQ, 999U);
+  NVIC_EnableIRQ(ISOTP_TIMER_IRQ);
+}
