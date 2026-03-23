@@ -299,7 +299,7 @@ int main(void) {
 
   // print hello
   print("\n\n\n************************ MAIN START " BOARD_NAME " ************************\n");
-  print("Panda version: "); print((const char *)pandaversion); print("\n");
+  print("App version: "); print((const char *)appversion); print("\n");
   print("Git version: "); print((const char *)gitversion); print("\n");
 
   // check for non-supported board types

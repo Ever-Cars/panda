@@ -153,11 +153,11 @@ with open("board/obj/gitversion.h", "w") as f:
     major, minor, patch = "0", "0", "0"
   version = get_version(BUILDER, BUILD_TYPE)
   f.write("#pragma once\n\n")
-  f.write(f'#define VERSION_MAJOR {major}\n')
-  f.write(f'#define VERSION_MINOR {minor}\n')
-  f.write(f'#define VERSION_PATCH {patch}\n\n')
-  f.write(f'extern const uint8_t pandaversion[{len(tag) + 1}];\n')
-  f.write(f'const uint8_t pandaversion[{len(tag) + 1}] = "{tag}";\n')
+  f.write(f'#define APP_VERSION_MAJOR {major}\n')
+  f.write(f'#define APP_VERSION_MINOR {minor}\n')
+  f.write(f'#define APP_VERSION_PATCH {patch}\n\n')
+  f.write(f'extern const uint8_t appversion[{len(tag) + 1}];\n')
+  f.write(f'const uint8_t appversion[{len(tag) + 1}] = "{tag}";\n')
   f.write(f'extern const uint8_t gitversion[{len(version)+1}];\n')
   f.write(f'const uint8_t gitversion[{len(version)+1}] = "{version}";\n')
 

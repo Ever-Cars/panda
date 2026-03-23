@@ -225,10 +225,10 @@ int comms_control_handler(ControlPacket_t *req, uint8_t *resp) {
       break;
     // **** 0xd7: get panda version
     case 0xd7:
-      COMPILE_TIME_ASSERT(sizeof(pandaversion) <= USBPACKET_MAX_SIZE);
-      resp[0] = VERSION_MAJOR;
-      resp[1] = VERSION_MINOR;
-      resp[2] = VERSION_PATCH;
+      COMPILE_TIME_ASSERT(sizeof(appversion) <= USBPACKET_MAX_SIZE);
+      resp[0] = APP_VERSION_MAJOR;
+      resp[1] = APP_VERSION_MINOR;
+      resp[2] = APP_VERSION_PATCH;
       resp_len = 3;
       break;
     // **** 0xd8: reset ST
