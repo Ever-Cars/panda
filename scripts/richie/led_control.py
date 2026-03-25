@@ -44,10 +44,9 @@ if __name__ == '__main__':
 
     while True:
         print(chr(27) + "[2J") # clear screen
-        print_leds() 
+        print_leds()
         led = int(input())
         if led < 1 or led > len(led_state):
             continue
 
         toggle_led(led)
-     
