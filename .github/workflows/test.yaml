@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - master
+      - richie
   pull_request:
 
 concurrency:
@@ -34,7 +35,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ['macos-latest', 'ubuntu-latest']
+        os: ["macos-latest", "ubuntu-latest"]
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
