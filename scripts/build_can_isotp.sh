@@ -10,7 +10,7 @@ fi
 tmpdir="$(mktemp -d)"
 trap 'rm -rf "$tmpdir"' EXIT
 
-git clone --depth 1 --branch mainline-5.4+ https://github.com/hartkopp/can-isotp.git "$tmpdir/can-isotp"
+git clone --depth 1 --branch mainline-6.17+ https://github.com/I-CAN-hack/can-isotp.git "$tmpdir/can-isotp"
 cd "$tmpdir/can-isotp"
 make
 
