@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import os
+import time
 import usb1
 import random
 import argparse
@@ -46,7 +47,7 @@ if __name__ == "__main__":
       elif bus == 2:
         bus2_count += 1
       count += 1
-    except usb1.USBErrorTimeout as e:
+    except usb1.USBErrorTimeout:
       pass
     except KeyboardInterrupt:
       break

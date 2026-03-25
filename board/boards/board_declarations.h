@@ -61,3 +61,4 @@ struct board {
 extern struct board board_tres;
 extern struct board board_cuatro;
 extern struct board board_red;
+extern struct board board_richie;

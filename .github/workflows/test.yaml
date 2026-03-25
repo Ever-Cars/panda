@@ -28,29 +28,29 @@ jobs:
       - name: Build release FW
         run: ${{ env.RUN }} "CERT=board/certs/debug RELEASE=1 scons"
 
-  # test:
-  #   name: ./test.sh
-  #   runs-on: ${{ matrix.os }}
-  #   strategy:
-  #     fail-fast: false
-  #     matrix:
-  #       os: ['macos-latest', 'ubuntu-latest']
-  #   timeout-minutes: 10
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - run: ./test.sh
+  test:
+    name: ./test.sh
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ['macos-latest', 'ubuntu-latest']
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: ./test.sh
 
-  # windows:
-  #   name: windows pip package test
-  #   runs-on: windows-latest
-  #   timeout-minutes: 10
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - uses: actions/setup-python@v5
-  #       with:
-  #         python-version: "3.12"
-  #     - uses: astral-sh/setup-uv@v5
-  #     - name: Install package with uv
-  #       run: uv pip install --system .
-  #     - name: Verify importing panda
-  #       run: python -c "from panda import Panda"
+  windows:
+    name: windows pip package test
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v5
+      - name: Install package with uv
+        run: uv pip install --system .
+      - name: Verify importing panda
+        run: python -c "from panda import Panda"

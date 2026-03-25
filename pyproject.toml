@@ -14,7 +14,7 @@ classifiers = [
 dependencies = [
   "libusb1",
   "libusb-package",
-  "opendbc @ git+ssh://git@github.com/Ever-Cars/opendbc.git@polar-bear#egg=opendbc",
+  "opendbc @ git+https://github.com/commaai/opendbc.git@3a852b049fb423cf57563e38b72ddd7592def221#egg=opendbc",
 
   # runtime dependency on comma four
   #"spidev; platform_system == 'Linux'",
@@ -26,7 +26,6 @@ dev = [
   "pycryptodome >= 3.9.8",
   "cffi",
   "flaky",
-  "prettytable",
   "pytest",
   "pytest-xdist",
   "pytest-mock",
