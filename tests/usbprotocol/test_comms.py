@@ -248,6 +248,43 @@ class TestPandaComms(unittest.TestCase):
 
     assert self.transport.read_isotp_bulk() == struct.pack("<H", 3) + b"xyz"
 
+  def test_isotp_receive_single_frame_with_implicit_rx_id(self):
+    cases = (
+      (0x700, False, 0x708),
+      (0x18DAF110, True, 0x18DA10F1),
+    )
+
+    for tx_arb_id, tx_extended, expected_rx_arb_id in cases:
+      with self.subTest(tx_arb_id=hex(tx_arb_id), tx_extended=tx_extended):
+        self.transport.reset_state()
+        self.transport.send_control(0xea, 0)
+
+        tx_packed = pack_isotp_arb_id(tx_arb_id, tx_extended)
+        self.transport.send_control(0xeb, tx_packed & 0xFFFF, tx_packed >> 16)
+
+        msg = libpanda_py.make_CANPacket(expected_rx_arb_id, 0, b"\x03xyz")
+        lpp.isotp_rx_hook(msg, 0)
+
+        assert self.transport.read_isotp_bulk() == struct.pack("<H", 3) + b"xyz"
+
+  def test_isotp_receive_single_frame_with_explicit_rx_id_override(self):
+    self.transport.send_control(0xea, 0)
+
+    tx_packed = pack_isotp_arb_id(0x700, False)
+    self.transport.send_control(0xeb, tx_packed & 0xFFFF, tx_packed >> 16)
+
+    rx_packed = pack_isotp_arb_id(0x70A, False)
+    self.transport.send_control(0xec, rx_packed & 0xFFFF, rx_packed >> 16)
+
+    implicit_msg = libpanda_py.make_CANPacket(0x708, 0, b"\x03bad")
+    lpp.isotp_rx_hook(implicit_msg, 0)
+    assert self.transport.read_isotp_bulk() == b""
+
+    explicit_msg = libpanda_py.make_CANPacket(0x70A, 0, b"\x03abc")
+    lpp.isotp_rx_hook(explicit_msg, 0)
+
+    assert self.transport.read_isotp_bulk() == struct.pack("<H", 3) + b"abc"
+
   def test_isotp_send_multi_frame_after_fc(self):
     self.transport.configure_isotp(0, 0x700, 0x708)
     payload = b"0123456789"

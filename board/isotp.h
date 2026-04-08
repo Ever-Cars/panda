@@ -450,6 +450,24 @@ static inline bool isotp_parse_packed_arb_id(uint32_t packed_id, uint32_t *arb_i
   return ret;
 }
 
+static inline bool isotp_derive_rx_arb_id(uint32_t tx_arb_id, bool tx_extended, uint32_t *rx_arb_id, bool *rx_extended) {
+  bool ret = true;
+
+  *rx_extended = tx_extended;
+
+  if (tx_extended) {
+    uint32_t upper = tx_arb_id & 0x1FFF0000U;
+    uint32_t third = (tx_arb_id >> 8U) & 0xFFU;
+    uint32_t fourth = tx_arb_id & 0xFFU;
+    *rx_arb_id = upper | (fourth << 8U) | third;
+  } else {
+    *rx_arb_id = tx_arb_id + 8U;
+    ret = (*rx_arb_id <= 0x7FFU);
+  }
+
+  return ret;
+}
+
 static inline void isotp_set_bus(uint8_t bus) {
   isotp_session.bus = bus;
   isotp_session.bus_set = true;
@@ -459,13 +477,24 @@ static inline void isotp_set_bus(uint8_t bus) {
 
 static inline bool isotp_set_tx_arb_id(uint32_t packed_id) {
   uint32_t arb_id;
+  uint32_t rx_arb_id;
   bool extended;
+  bool rx_extended;
   bool ret = isotp_parse_packed_arb_id(packed_id, &arb_id, &extended);
 
   if (ret) {
     isotp_session.tx_id = arb_id;
     isotp_session.tx_id_extended = extended;
     isotp_session.tx_id_set = true;
+
+    if (isotp_derive_rx_arb_id(arb_id, extended, &rx_arb_id, &rx_extended)) {
+      isotp_session.rx_id = rx_arb_id;
+      isotp_session.rx_id_extended = rx_extended;
+      isotp_session.rx_id_set = true;
+    } else {
+      isotp_session.rx_id_set = false;
+    }
+
     isotp_update_configured();
     comms_isotp_reset();
   }
