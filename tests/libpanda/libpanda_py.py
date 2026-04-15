@@ -24,6 +24,15 @@ typedef struct {
 """, packed=True)
 
 ffi.cdef("""
+typedef struct {
+  uint8_t request;
+  uint16_t param1;
+  uint16_t param2;
+  uint16_t length;
+} ControlPacket_t;
+""", packed=True)
+
+ffi.cdef("""
 int set_safety_hooks(uint16_t mode, uint16_t param);
 """)
 
@@ -46,7 +55,15 @@ void can_set_checksum(CANPacket_t *packet);
 int comms_can_read(uint8_t *data, uint32_t max_len);
 void comms_can_write(uint8_t *data, uint32_t len);
 void comms_can_reset(void);
+int comms_isotp_read(uint8_t *data, uint32_t max_len);
+void comms_isotp_write(uint8_t *data, uint32_t len);
+void comms_isotp_reset(void);
+bool comms_isotp_can_write_usb(void);
 uint32_t can_slots_empty(can_ring *q);
+int comms_control_handler(ControlPacket_t *req, uint8_t *resp);
+void isotp_periodic_handler(uint32_t now_us);
+void isotp_rx_hook(CANPacket_t *msg, uint32_t now_us);
+void set_microsecond_timer(uint32_t time);
 """)
 
 class CANPacket:
