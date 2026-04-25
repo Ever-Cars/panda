@@ -41,6 +41,11 @@ int main(void) {
 #ifdef PANDA_JUNGLE
   current_board->set_panda_power(true);
 #endif
+#ifdef RICHIE
+  if (get_gpio_input(GPIOA, 5) == 1) {
+    soft_flasher_start();
+  }
+#endif
 
   if (enter_bootloader_mode == ENTER_SOFTLOADER_MAGIC) {
     enter_bootloader_mode = 0;

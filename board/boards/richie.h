@@ -58,8 +58,10 @@ static void richie_init(void) {
 
   // A3, A5, B13: nRF9151 gpios
   // A3 will be used to synchronize SPI communication
+  // A5 will be used to put panda in bootloader mode when held high on reset
   set_gpio_pullup(GPIOA, 3, PULL_NONE);
   set_gpio_mode(GPIOA, 3, MODE_OUTPUT);
+  set_gpio_pullup(GPIOA, 5, PULL_DOWN);
   set_gpio_mode(GPIOA, 5, MODE_INPUT);
   set_gpio_mode(GPIOB, 13, MODE_INPUT);
 
