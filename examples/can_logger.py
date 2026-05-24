@@ -6,7 +6,7 @@ from opendbc.car.structs import CarParams
 
 def can_logger():
   p = Panda()
-  p.set_safety_mode(CarParams.SafetyModel.allOutput)
+  p.set_safety_mode(CarParams.SafetyModel.silent)
 
   try:
     outputfile = open('output.csv', 'w')
