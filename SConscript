@@ -148,9 +148,11 @@ with open("board/obj/gitversion.h", "w") as f:
   tag = get_tag()
   print(f"Firmware version: {tag}")
   # split and ignore v prefix
-  try:
-    major, minor, patch = tag[1:].split('.')
-  except ValueError:
+  import re
+  m = re.match(r'v?(\d+)\.(\d+)\.(\d+)', tag)
+  if m:
+    major, minor, patch = m.group(1), m.group(2), m.group(3)
+  else:
     major, minor, patch = "0", "0", "0"
   version = get_version(BUILDER, BUILD_TYPE)
   f.write("#pragma once\n\n")
