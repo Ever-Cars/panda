@@ -14,7 +14,7 @@ classifiers = [
 dependencies = [
   "libusb1",
   "libusb-package",
-  "opendbc @ git+https://github.com/commaai/opendbc.git@3a852b049fb423cf57563e38b72ddd7592def221#egg=opendbc",
+  "opendbc @ git+https://github.com/commaai/opendbc.git@9f72a29fb86fb6a1f0c3b506062cf79606e96191#egg=opendbc",
 
   # runtime dependency on comma four
   #"spidev; platform_system == 'Linux'",
@@ -32,8 +32,8 @@ dev = [
   "pytest-timeout",
   "ruff",
   "setuptools",
-  "gcc-arm-none-eabi @ git+https://github.com/commaai/dependencies.git@releases#subdirectory=gcc-arm-none-eabi",
-  "cppcheck @ git+https://github.com/commaai/dependencies.git@releases#subdirectory=cppcheck",
+  "gcc-arm-none-eabi @ git+https://github.com/commaai/dependencies.git@release-gcc-arm-none-eabi#subdirectory=gcc-arm-none-eabi",
+  "cppcheck @ git+https://github.com/commaai/dependencies.git@release-cppcheck#subdirectory=cppcheck",
 ]
 
 [build-system]
@@ -48,6 +48,10 @@ packages = [
   "panda.board.body",
   "panda.board.jungle",
 ]
+
+[tool.setuptools.package-data]
+"panda.board" = ["health.h"]
+"panda.board.jungle" = ["jungle_health.h"]
 
 [tool.setuptools.package-dir]
 panda = "."
