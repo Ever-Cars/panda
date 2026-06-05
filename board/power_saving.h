@@ -40,7 +40,7 @@ void set_power_save_state(int state) {
       enable = true;
     }
 
-    enable_can_transceivers(enable);
+    enable_can_transceivers(false);
 
     // Switch off IR when in power saving
     if(!enable){

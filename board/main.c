@@ -340,7 +340,7 @@ int main(void) {
   set_safety_mode(SAFETY_SILENT, 0U);
 
   // enable CAN TXs
-  enable_can_transceivers(true);
+  enable_can_transceivers(false);
 
   // init watchdog for heartbeat loop, fed at 8Hz
   simple_watchdog_init(FAULT_HEARTBEAT_LOOP_WATCHDOG, (3U * 1000000U / 8U));
