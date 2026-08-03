@@ -38,6 +38,10 @@ bool harness_check_ignition(void) {
   // wait until we're not reading the analog voltages anymore
   while (harness.sbu_adc_lock) {}
 
+  if (current_board->harness_config == NULL) {
+    return ret;
+  }
+
   switch(harness.status){
     case HARNESS_STATUS_NORMAL:
       ret = !get_gpio_input(current_board->harness_config->GPIO_SBU1, current_board->harness_config->pin_SBU1);
@@ -55,8 +59,9 @@ static uint8_t harness_detect_orientation(void) {
   uint8_t ret = harness.status;
 
   #ifndef BOOTSTUB
-  // We can't detect orientation if the relay is being driven
-  if (!harness.relay_driven) {
+  if (current_board->harness_config == NULL) {
+    ret = HARNESS_STATUS_NORMAL;
+  } else if (!harness.relay_driven) {
     harness.sbu_adc_lock = true;
     set_gpio_mode(current_board->harness_config->GPIO_SBU1, current_board->harness_config->pin_SBU1, MODE_ANALOG);
     set_gpio_mode(current_board->harness_config->GPIO_SBU2, current_board->harness_config->pin_SBU2, MODE_ANALOG);
@@ -78,10 +83,6 @@ static uint8_t harness_detect_orientation(void) {
     } else {
       ret = HARNESS_STATUS_NC;
     }
-#ifdef RICHIE
-    // Richie doesn't have proper harness orientation detection, so just assume normal
-    ret = HARNESS_STATUS_NORMAL;
-#endif
 
     // Pins are not 5V tolerant in ADC mode
     set_gpio_mode(current_board->harness_config->GPIO_SBU1, current_board->harness_config->pin_SBU1, MODE_INPUT);

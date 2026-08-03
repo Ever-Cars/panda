@@ -9,12 +9,9 @@
 static void richie_enable_can_transceiver(uint8_t transceiver, bool enabled) {
   switch (transceiver) {
     case 1U:
-      set_gpio_output(GPIOB, 7, !enabled); // Enable Pin
-      set_gpio_output(GPIOB, 2, !enabled); // Standby Pin
-      break;
-    case 2U:
-      set_gpio_output(GPIOB, 4, !enabled); // Enable Pin
-      set_gpio_output(GPIOB, 3, !enabled); // Stanby Pin
+      set_gpio_output(GPIOB, 7, !enabled); // CAN1 Enable Pin
+      set_gpio_output(GPIOB, 5, !enabled); // CAN1 Standby Pin
+      // set_gpio_output(GPIOB, 4, !enabled); // DOIP_EN (active low)
       break;
     default:
       break;
@@ -22,39 +19,38 @@ static void richie_enable_can_transceiver(uint8_t transceiver, bool enabled) {
 }
 
 static void richie_set_can_mode(uint8_t mode) {
-  richie_enable_can_transceiver(2U, false);
-  switch (mode) {
-    case CAN_MODE_NORMAL:
-    case CAN_MODE_OBD_CAN2:
-      // B5,B6: FDCAN2 mode
-      set_gpio_pullup(GPIOB, 5, PULL_NONE);
-      set_gpio_alternate(GPIOB, 5, GPIO_AF9_FDCAN2);
+  // Only CAN 1 (FDCAN1 on B8/B9). CAN_SEL on PB6 routes to normal/OBD.
+  set_gpio_output(GPIOB, 6, (mode == CAN_MODE_OBD_CAN2) ? 1 : 0);
+  richie_enable_can_transceiver(1U, true);
+}
 
-      set_gpio_pullup(GPIOB, 6, PULL_NONE);
-      set_gpio_alternate(GPIOB, 6, GPIO_AF9_FDCAN2);
-      richie_enable_can_transceiver(2U, true);
-      break;
-    default:
-      break;
-  }
+static uint32_t richie_read_voltage_mV(void) {
+  // PA6 = ADC12_INP3, 12V sense, 220k/(220k+1M) = 0.1803... = 11/61
+  return (adc_get_mV(&(const adc_signal_t) ADC_CHANNEL_DEFAULT(ADC1, 3)) * 61U) / 11U;
 }
 
 static void richie_init(void) {
   common_init_gpio();
 
-  // B2,B3: transceiver standby
-  set_gpio_pullup(GPIOB, 2, PULL_NONE);
-  set_gpio_mode(GPIOB, 2, MODE_OUTPUT);
+  // B5: CAN1 transceiver standby
+  set_gpio_pullup(GPIOB, 5, PULL_NONE);
+  set_gpio_mode(GPIOB, 5, MODE_OUTPUT);
 
-  set_gpio_pullup(GPIOB, 3, PULL_NONE);
-  set_gpio_mode(GPIOB, 3, MODE_OUTPUT);
-
-  // B4,B7: transceiver enable
-  set_gpio_pullup(GPIOB, 4, PULL_NONE);
-  set_gpio_mode(GPIOB, 4, MODE_OUTPUT);
-
+  // B7: CAN1 transceiver enable
   set_gpio_pullup(GPIOB, 7, PULL_NONE);
   set_gpio_mode(GPIOB, 7, MODE_OUTPUT);
+
+  // PB4: DOIP enable
+  // set_gpio_pullup(GPIOB, 4, PULL_NONE);
+  // set_gpio_mode(GPIOB, 4, MODE_OUTPUT);
+
+  // PB6: CAN select
+  set_gpio_pullup(GPIOB, 6, PULL_NONE);
+  set_gpio_mode(GPIOB, 6, MODE_OUTPUT);
+
+  // PA6: 12V sense (ADC)
+  set_gpio_pullup(GPIOA, 6, PULL_NONE);
+  set_gpio_mode(GPIOA, 6, MODE_ANALOG);
 
   // A3, A5, B13: nRF9151 gpios
   // A3 will be used to synchronize SPI communication
@@ -69,20 +65,9 @@ static void richie_init(void) {
   gpio_spi_init();
 }
 
-static harness_configuration richie_harness_config = {
-  .GPIO_SBU1 = GPIOA,
-  .GPIO_SBU2 = GPIOB,
-  .GPIO_relay_SBU1 = NULL,
-  .GPIO_relay_SBU2 = NULL,
-  .pin_SBU1 = 6,
-  .pin_SBU2 = 1,
-  .adc_signal_SBU1 = ADC_CHANNEL_DEFAULT(ADC1, 3), // ADC12_INP3
-  .adc_signal_SBU2 = ADC_CHANNEL_DEFAULT(ADC1, 5) // ADC1_INP5
-};
-
 board board_richie = {
   .set_bootkick = unused_set_bootkick,
-  .harness_config = &richie_harness_config,
+  .harness_config = NULL,
   .has_spi = true,
   .has_fan = false,
   .avdd_mV = 3300U,
@@ -93,7 +78,7 @@ board board_richie = {
   .led_GPIO = {GPIOE, GPIOE, GPIOE},
   .led_pin = {4, 3, 2},
   .set_can_mode = richie_set_can_mode,
-  .read_voltage_mV = unused_read_voltage_mV,
+  .read_voltage_mV = richie_read_voltage_mV,
   .read_current_mA = unused_read_current,
   .set_fan_enabled = unused_set_fan_enabled,
   .set_ir_power = unused_set_ir_power,

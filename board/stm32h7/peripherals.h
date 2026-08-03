@@ -55,17 +55,17 @@ void common_init_gpio(void) {
   set_gpio_pullup(GPIOB, 9, PULL_NONE);
   set_gpio_alternate(GPIOB, 9, GPIO_AF9_FDCAN1);
 
-#ifndef RICHIE
+#ifdef RICHIE_REV2
   // B5,B6 (mplex to B12,B13): FDCAN2
   set_gpio_pullup(GPIOB, 12, PULL_NONE);
   set_gpio_pullup(GPIOB, 13, PULL_NONE);
-#endif
 
   set_gpio_pullup(GPIOB, 5, PULL_NONE);
   set_gpio_alternate(GPIOB, 5, GPIO_AF9_FDCAN2);
 
   set_gpio_pullup(GPIOB, 6, PULL_NONE);
   set_gpio_alternate(GPIOB, 6, GPIO_AF9_FDCAN2);
+#endif
 
 #ifndef RICHIE
   // G9,G10: FDCAN3
