@@ -714,6 +714,9 @@ class Panda:
   def set_obd(self, obd):
     self._handle.controlWrite(Panda.REQUEST_OUT, 0xdb, int(obd), 0, b'')
 
+  def set_doip_enabled(self, enabled):
+    self._handle.controlWrite(Panda.REQUEST_OUT, 0xb6, int(enabled), 0, b'')
+
   def set_can_loopback(self, enable):
     # set can loopback mode for all buses
     self._handle.controlWrite(Panda.REQUEST_OUT, 0xe5, int(enable), 0, b'')

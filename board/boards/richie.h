@@ -11,11 +11,14 @@ static void richie_enable_can_transceiver(uint8_t transceiver, bool enabled) {
     case 1U:
       set_gpio_output(GPIOB, 7, !enabled); // CAN1 Enable Pin
       set_gpio_output(GPIOB, 5, !enabled); // CAN1 Standby Pin
-      // set_gpio_output(GPIOB, 4, !enabled); // DOIP_EN (active low)
       break;
     default:
       break;
   }
+}
+
+static void richie_set_doip_enabled(bool enabled) {
+  set_gpio_output(GPIOB, 4, enabled);
 }
 
 static void richie_set_can_mode(uint8_t mode) {
@@ -40,9 +43,9 @@ static void richie_init(void) {
   set_gpio_pullup(GPIOB, 7, PULL_NONE);
   set_gpio_mode(GPIOB, 7, MODE_OUTPUT);
 
-  // PB4: DOIP enable
-  // set_gpio_pullup(GPIOB, 4, PULL_NONE);
-  // set_gpio_mode(GPIOB, 4, MODE_OUTPUT);
+  // PB4: keep the DOIP_EN PFET disabled until explicitly enabled
+  set_gpio_pullup(GPIOB, 4, PULL_NONE);
+  richie_set_doip_enabled(false);
 
   // PB6: CAN select
   set_gpio_pullup(GPIOB, 6, PULL_NONE);
