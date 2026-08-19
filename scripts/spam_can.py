@@ -13,14 +13,14 @@ def get_test_string():
   return b"test" + os.urandom(10)
 
 if __name__ == "__main__":
-  parser = argparse.ArgumentParser(description="Read VIN from a vehicle using UDS over CAN.")
+  parser = argparse.ArgumentParser(description="Spam CAN buses with random messages.")
   parser.add_argument('-b', '--bus', type=int, action='append',
                       help='CAN bus number to spam (can be specified multiple times, e.g., -b 0 -b 1 -b 2)')
   parser.add_argument('-p', '--packets', type=int, default=None,
                       help='Number of packets to send (default: infinite)')
   args = parser.parse_args()
 
-  buses = [args.bus] if args.bus is not None else [0, 1, 2]
+  buses = args.bus if args.bus is not None else [0, 1, 2]
   packets = args.packets
 
   p = Panda()

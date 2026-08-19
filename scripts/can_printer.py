@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import argparse
 import os
 import time
 from collections import defaultdict
@@ -12,12 +13,18 @@ def sec_since_boot():
   return time.time()
 
 def can_printer():
+  parser = argparse.ArgumentParser(description="Print received CAN messages.")
+  parser.add_argument('--mux-obd', action='store_true', help='Route CAN to OBD pins 3 and 11 through DG419 mux on susan')
+  args = parser.parse_args()
+
   p = Panda()
   print(f"Connected to id: {p.get_serial()[0]}: {p.get_version()}")
   time.sleep(1)
 
   p.can_clear(0xFFFF)
   p.set_safety_mode(CarParams.SafetyModel.allOutput)
+  if args.mux_obd:
+    p.set_obd(True)
 
   start = sec_since_boot()
   lp = sec_since_boot()
