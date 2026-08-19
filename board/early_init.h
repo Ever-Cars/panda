@@ -58,9 +58,7 @@ void early_initialization(void) {
   if (enter_bootloader_mode == ENTER_BOOTLOADER_MAGIC) {
     led_init();
     current_board->init_bootloader();
-  #ifndef HW_RICHIE_REV1
     led_set(LED_GREEN, 1);
-  #endif
     jump_to_bootloader();
   }
 }

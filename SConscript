@@ -183,7 +183,7 @@ common_flags += [f"-DHEALTH_PACKET_VERSION=0x{hh:08X}U", f"-DCAN_PACKET_VERSION_
                  f"-DJUNGLE_HEALTH_PACKET_VERSION=0x{jh:08X}U"]
 
 # panda fw (default: richie_rev3)
-build_project("panda_h7", base_project_h7, "./board/main.c", ['-DRICHIE'])
+build_project("panda_h7", base_project_h7, "./board/main.c", ['-DRICHIE', '-DRICHIE_REV3'])
 
 # panda fw rev2 (legacy, uncomment if needed)
 # build_project("panda_h7_rev2", base_project_h7, "./board/main.c", ['-DRICHIE', '-DRICHIE_REV2'])

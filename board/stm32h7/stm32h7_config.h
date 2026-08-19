@@ -1,3 +1,15 @@
+#if defined(RICHIE_REV2) && defined(RICHIE_REV3)
+  #error "Richie revision flags are mutually exclusive"
+#endif
+
+#if (defined(RICHIE_REV2) || defined(RICHIE_REV3)) && !defined(RICHIE)
+  #error "Richie revision flags require RICHIE"
+#endif
+
+#if defined(RICHIE) && !defined(RICHIE_REV2) && !defined(RICHIE_REV3)
+  #error "RICHIE requires an explicit revision flag"
+#endif
+
 #include "stm32h7xx.h"
 #include "stm32h7xx_hal_gpio_ex.h"
 #define MCU_IDCODE 0x483U

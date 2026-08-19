@@ -98,7 +98,7 @@ int comms_control_handler(ControlPacket_t *req, uint8_t *resp) {
       resp[1] = ((fan_state.rpm & 0xFF00U) >> 8U);
       resp_len = 2;
       break;
-    #if defined(ALLOW_DEBUG) && defined(RICHIE) && !defined(RICHIE_REV2)
+    #if defined(ALLOW_DEBUG) && defined(RICHIE_REV3)
     // **** 0xb6: DEBUG: set Richie rev3 DoIP enabled
     case 0xb6:
       richie_set_doip_enabled(req->param1 != 0U);

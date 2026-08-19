@@ -26,9 +26,7 @@
 #include "board/can_comms.h"
 #include "board/main_comms.h"
 
-#ifdef HW_RICHIE_REV1
-  #define BOARD_NAME "RICHIE REV 1"
-#elif defined(RICHIE)
+#ifdef RICHIE
   #define BOARD_NAME "RICHIE"
 #else
   #define BOARD_NAME "PANDA"
@@ -171,9 +169,7 @@ static void tick_handler(void) {
       #endif
 
       // set green LED to be controls allowed
-    #ifndef HW_RICHIE_REV1
       led_set(LED_GREEN, controls_allowed);
-    #endif
 
       // turn off the blue LED, turned on by CAN
       // unless we are in power saving mode
@@ -298,11 +294,7 @@ int main(void) {
   led_init();
   // red+green leds enabled until succesful USB/SPI init, as a debug indicator
   led_set(LED_RED, true);
-#ifdef HW_RICHIE_REV1
-  led_set(LED_BLUE, true);
-#else
   led_set(LED_GREEN, true);
-#endif
   adc_init(ADC1);
 
   // print hello
