@@ -5,6 +5,11 @@ struct harness_t harness;
 // The ignition relay is only used for testing purposes
 void set_intercept_relay(bool intercept, bool ignition_relay) {
   bool drive_relay = intercept;
+
+  if (current_board->harness_config == NULL) {
+    return;
+  }
+
   if (harness.status == HARNESS_STATUS_NC) {
     // no harness, no relay to drive
     drive_relay = false;
@@ -35,12 +40,12 @@ void set_intercept_relay(bool intercept, bool ignition_relay) {
 bool harness_check_ignition(void) {
   bool ret = false;
 
-  // wait until we're not reading the analog voltages anymore
-  while (harness.sbu_adc_lock) {}
-
   if (current_board->harness_config == NULL) {
     return ret;
   }
+
+  // wait until we're not reading the analog voltages anymore
+  while (harness.sbu_adc_lock) {}
 
   switch(harness.status){
     case HARNESS_STATUS_NORMAL:
@@ -60,8 +65,10 @@ static uint8_t harness_detect_orientation(void) {
 
   #ifndef BOOTSTUB
   if (current_board->harness_config == NULL) {
-    ret = HARNESS_STATUS_NORMAL;
-  } else if (!harness.relay_driven) {
+    return HARNESS_STATUS_NORMAL;
+  }
+
+  if (!harness.relay_driven) {
     harness.sbu_adc_lock = true;
     set_gpio_mode(current_board->harness_config->GPIO_SBU1, current_board->harness_config->pin_SBU1, MODE_ANALOG);
     set_gpio_mode(current_board->harness_config->GPIO_SBU2, current_board->harness_config->pin_SBU2, MODE_ANALOG);
