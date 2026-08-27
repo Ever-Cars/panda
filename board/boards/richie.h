@@ -24,7 +24,7 @@ static void richie_set_doip_enabled(bool enabled) {
 
 static void richie_set_can_mode(uint8_t mode) {
   // Only CAN 1 (FDCAN1 on B8/B9). CAN_SEL on PB6 routes to normal/OBD.
-  UNUSED(mode);
+  set_gpio_output(GPIOB, 6, (mode == CAN_MODE_OBD_CAN2) ? 1 : 0);
   richie_enable_can_transceiver(1U, true);
 }
 
