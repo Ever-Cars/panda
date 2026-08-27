@@ -9,6 +9,7 @@
 static void richie_enable_can_transceiver(uint8_t transceiver, bool enabled) {
   switch (transceiver) {
     case 1U:
+    case 2U:
       set_gpio_output(GPIOB, 7, !enabled); // CAN1 Enable Pin
       set_gpio_output(GPIOB, 5, !enabled); // CAN1 Standby Pin
       break;
