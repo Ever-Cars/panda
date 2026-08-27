@@ -14,10 +14,11 @@ def sec_since_boot():
 
 def can_printer():
   parser = argparse.ArgumentParser(description="Print received CAN messages.")
+  parser.add_argument('-s', '--serial', help='Serial number of the Panda to connect to')
   parser.add_argument('--mux-obd', action='store_true', help='Route CAN to OBD pins 3 and 11 through DG419 mux on susan')
   args = parser.parse_args()
 
-  p = Panda()
+  p = Panda(serial=args.serial)
   print(f"Connected to id: {p.get_serial()[0]}: {p.get_version()}")
   time.sleep(1)
 

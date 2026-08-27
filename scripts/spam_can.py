@@ -14,6 +14,7 @@ def get_test_string():
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(description="Spam CAN buses with random messages.")
+  parser.add_argument('-s', '--serial', help='Serial number of the Panda to connect to')
   parser.add_argument('-b', '--bus', type=int, action='append',
                       help='CAN bus number to spam (can be specified multiple times, e.g., -b 0 -b 1 -b 2)')
   parser.add_argument('-p', '--packets', type=int, default=None,
@@ -23,7 +24,7 @@ if __name__ == "__main__":
   buses = args.bus if args.bus is not None else [0, 1, 2]
   packets = args.packets
 
-  p = Panda()
+  p = Panda(serial=args.serial)
   p.set_safety_mode(CarParams.SafetyModel.allOutput)
 
   print(f"Spamming buses: {buses}")
