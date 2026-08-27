@@ -15,12 +15,9 @@
 #include "board/boards/red.h"
 #include "board/boards/tres.h"
 #include "board/boards/cuatro.h"
-#if defined(RICHIE_REV2)
+#ifdef RICHIE_REV2
   #include "board/boards/richie_rev2.h"
-#elif defined(RICHIE_REV3)
-  #include "board/boards/richie.h"
 #else
-  // Generic H7 builds need this definition for runtime board detection.
   #include "board/boards/richie.h"
 #endif
 
