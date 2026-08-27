@@ -77,7 +77,11 @@ void set_safety_mode(uint16_t mode, uint16_t param) {
       // TODO: rewrite using hardware queues rather than fifo to cancel specific messages
       can_clear_send(CANIF_FROM_CAN_NUM(1), 1);
       if (param == 0U) {
+#ifdef RICHIE
+        current_board->set_can_mode(CAN_MODE_NORMAL);
+#else
         current_board->set_can_mode(CAN_MODE_OBD_CAN2);
+#endif
       } else {
         current_board->set_can_mode(CAN_MODE_NORMAL);
       }
