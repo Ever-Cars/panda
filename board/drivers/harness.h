@@ -35,22 +35,20 @@ void set_intercept_relay(bool intercept, bool ignition_relay) {
 bool harness_check_ignition(void) {
   bool ret = false;
 
-  // wait until we're not reading the analog voltages anymore
-  while (harness.sbu_adc_lock) {}
+  if (current_board->harness_config != NULL) {
+    // wait until we're not reading the analog voltages anymore
+    while (harness.sbu_adc_lock) {}
 
-  if (current_board->harness_config == NULL) {
-    return ret;
-  }
-
-  switch(harness.status){
-    case HARNESS_STATUS_NORMAL:
-      ret = !get_gpio_input(current_board->harness_config->GPIO_SBU1, current_board->harness_config->pin_SBU1);
-      break;
-    case HARNESS_STATUS_FLIPPED:
-      ret = !get_gpio_input(current_board->harness_config->GPIO_SBU2, current_board->harness_config->pin_SBU2);
-      break;
-    default:
-      break;
+    switch(harness.status){
+      case HARNESS_STATUS_NORMAL:
+        ret = !get_gpio_input(current_board->harness_config->GPIO_SBU1, current_board->harness_config->pin_SBU1);
+        break;
+      case HARNESS_STATUS_FLIPPED:
+        ret = !get_gpio_input(current_board->harness_config->GPIO_SBU2, current_board->harness_config->pin_SBU2);
+        break;
+      default:
+        break;
+    }
   }
   return ret;
 }
@@ -88,6 +86,8 @@ static uint8_t harness_detect_orientation(void) {
     set_gpio_mode(current_board->harness_config->GPIO_SBU1, current_board->harness_config->pin_SBU1, MODE_INPUT);
     set_gpio_mode(current_board->harness_config->GPIO_SBU2, current_board->harness_config->pin_SBU2, MODE_INPUT);
     harness.sbu_adc_lock = false;
+  } else {
+    // Keep the previous orientation while the relay is being driven.
   }
   #endif
 
