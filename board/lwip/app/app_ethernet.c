@@ -24,7 +24,7 @@
 #endif
 #include "app_ethernet.h"
 #include "ethernetif.h"
-#include "usb_debug.h"
+#include "main_declarations.h"
 
 /* Private typedef -----------------------------------------------------------*/
 /* Private define ------------------------------------------------------------*/

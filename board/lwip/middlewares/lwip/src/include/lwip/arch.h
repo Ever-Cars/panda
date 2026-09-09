@@ -46,7 +46,7 @@
 #endif
 
 #include "arch/cc.h"
-#include "usb_debug.h"
+#include "main_declarations.h"
 
 /**
  * @defgroup compiler_abstraction Compiler/platform abstraction

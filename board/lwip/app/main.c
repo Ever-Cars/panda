@@ -33,7 +33,7 @@
 #include "app_ethernet.h"
 #include "tcp_echoserver.h"
 #include "usb_core.h"
-#include "usb_debug.h"
+#include "main_declarations.h"
 
 /* Private typedef -----------------------------------------------------------*/
 /* Private define ------------------------------------------------------------*/

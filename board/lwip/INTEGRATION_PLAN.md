@@ -150,7 +150,7 @@ rename below is reviewable as a diff.
 |---|---|---|
 | `app/main.c` | existing `app/lwip.c` | `MPU_Config`/`CPU_CACHE_Enable`/`SystemClock_Config`/`HAL_Init` all drop — panda's `clock_init()`/`early_init` own that. `Netif_Config`, the poll-loop body and the MCO1 config already live in `lwip.c`. |
 | `app/stm32h7xx_it.c`, `inc/stm32h7xx_it.h` | `stm32h7/interrupt_handlers.h`, `sys/faults.h` | Kills the `OTG_HS_IRQHandler` and core-exception-handler symbol clashes, and the `SysTick_Handler`/`HAL_IncTick` time base we replace in Phase 2. |
-| `drivers/usb/` (entire dir: `usb_core.c/.h`, `usb_debug.c/.h`, `usb_hw.h`) | `drivers/usb.h` + `stm32h7/llusb.h`; `print` from `drivers/uart.h` | Kills `usb_init`/`usb_irqhandler` clashes. lwip files get `extern void print(const char *a);` via the new port header. |
+| `drivers/usb/` (entire dir: `usb_core.c/.h`, `usb_debug.c/.h`, `usb_hw.h`) | `drivers/usb.h` + `stm32h7/llusb.h`; `print`/`putch`/`puth`/`puthx` from `drivers/uart.h` | Kills `usb_init`/`usb_irqhandler` clashes. `usb_debug.h`'s four prototypes are byte-identical to panda's, so the swap is a pure `#include` change — see Phase 2's `lwip_port.h` and Phase 3 item 5. Five files include `usb_debug.h`; three (`app/main.c`, `usb_core.c`, `usb_debug.c`) are deleted here, leaving **`lwip/arch.h:49`** and `app/app_ethernet.c` to edit. |
 | `drivers/bsp/` (entire dir: `richie.c/.h`, `richie_errno.h`) | `drivers/led.h` + `boards/richie.h` | BSP LED driver duplicates panda's LED driver on the same PE2/3/4 pins. `BSP_MCO1_Init` content is already folded into `lwip.c`. Also resolves the `richie.h` filename collision. |
 | `drivers/cmsis/` (entire dir, incl. `system_stm32h7xx.c`) | `stm32h7/inc/` via include path | CMSIS headers are byte-identical duplicates. The three objects `hal_rcc.c` needs from `system_stm32h7xx.c` (`SystemCoreClock`, `SystemD2Clock`, `D1CorePrescTable`) move into the port file (Phase 2). This also guarantees `SystemInit` never reappears (panda's startup deliberately doesn't call it). |
 | `middlewares/libc/`: `memcpy.c`, `memset.c`, `memcpy-armv7m.S`, `strlen-armv7.S`, `strcmp-armv7.S`, `aeabi_memclr.c`, `aeabi_memcpy.c`, `aeabi_memmove.S`, `aeabi_memset.S` | `libc.h` (`memcpy`/`memset`/`memcmp`) | Direct symbol clashes (C and asm variants). GCC with panda's flags emits plain `memcpy`/`memset` calls, never `__aeabi_*`, so the aeabi shims go too. **Keep**: `memmove.c`, `strcmp.c`, `strlen.c`, `strncmp.c`, `stdlib_minimal.c` (provides `rand` for `LWIP_RAND`), `arm_asm.h`, `newlib_string_local.h` — panda has no implementations of these. |
@@ -224,10 +224,21 @@ Note the heap array itself already lives in `lwip.c`, not here.
 ### `lwip/inc/lwip_port.h`
 
 Declares the panda symbols lwip code needs, so no lwip file has to include panda headers (which
-would drag in the whole firmware world):
+would drag in the whole firmware world). This is the **only** replacement `usb_debug.h` needs:
+panda's `drivers/uart.h` exports the same four debug functions with **byte-identical signatures**
+(compare `drivers/usb/usb_debug.h:20-24` against `drivers/drivers.h:271-274`), so no call site in
+the lwip tree changes — only `#include` lines.
 
 ```c
-extern void print(const char *a);                      // drivers/uart.h
+#include <stdbool.h>
+#include <stdint.h>
+
+// drivers/uart.h — same four prototypes usb_debug.h declared, so every existing
+// print()/puth() call site in the lwip tree keeps working unchanged.
+void putch(const char a);
+void print(const char *a);
+void puthx(uint32_t i, uint8_t len);
+void puth(unsigned int i);
 
 // drivers/gpio.h — used instead of HAL_GPIO_Init so panda's register_map stays in sync.
 // Constants mirror board/drivers/gpio.h; keep in step if that file ever changes.
@@ -277,13 +288,40 @@ extern void set_gpio_pullup(GPIO_TypeDef *GPIO, unsigned int pin, unsigned int m
    (drop `__FILE__`/`__LINE__` formatting); keep `LWIP_RAND() ((u32_t)rand())` and add
    **[CORRECTED]** `int rand(void);` — **not** `unsigned int`, which conflicts with the definition
    in `stdlib_minimal.c` and will not compile.
-5. **`inc/lwipopts.h`**:
+5. **[NEW] `middlewares/lwip/src/include/lwip/arch.h`** — the original plan missed this file
+   entirely, and it is the one that actually matters for debug prints. It has been modified from
+   stock lwIP and is included by **every** lwIP translation unit. Two edits:
+   - Line 49: `#include "usb_debug.h"` → `#include "lwip_port.h"`. Resolves via `Dir('inc')` on the
+     lwip CPPPATH (Phase 4). After the Phase 1 deletions this and `app_ethernet.c` are the only two
+     `usb_debug.h` includers left, and no call site needs touching because the prototypes match.
+   - Lines 81-95: `LWIP_PLATFORM_DIAG` is a `static inline lwip_platform_diag()` built on
+     `vsnprintf`, with `#include <stdio.h>`/`<stdlib.h>` alongside it. This does not break the build
+     today **only** because `LWIP_DEBUG` is unset in `lwipopts.h`, so `LWIP_DEBUGF` compiles away
+     and the unreferenced `static inline` is never emitted. The first time anyone enables
+     `LWIP_DEBUG` to chase a bug, the link fails on `vsnprintf` under `-nostdlib`. Replace it now
+     with a `print`-only version (drop the format arguments, or keep a tiny `%s`/`%d` handler) and
+     delete the two stdio includes, so lwIP's own debug output is usable when needed.
+6. **`inc/lwipopts.h`**:
    - The `LWIP_RAM_HEAP_POINTER` symbol replacement is **done**.
    - **[NEW]** Add `#define PBUF_POOL_SIZE 0` (or 2 as a safety net) — the default of 16 costs
      ~24.8K of DTCM `.bss` that the zero-copy RX path never uses.
    - All other memp pools (TCP PCBs etc., never DMA-touched) stay in DTCM `.bss` — no change.
-6. **`inc/stm32h7xx_hal_conf.h`**: trim modules per Phase 1; `HSE_VALUE` is already 25000000
+7. **`inc/stm32h7xx_hal_conf.h`**: trim modules per Phase 1; `HSE_VALUE` is already 25000000
    (matches panda's crystal per `clock.h`) — leave it.
+
+### [NEW] Where lwIP debug output ends up
+
+Not a UART pin. Panda's `print()` calls `putch()`, which does
+`(void)injectc(&uart_ring_debug, a)` — a **1 KB software ring** (`FIFO_SIZE_INT 0x400`,
+`drivers/drivers.h:245`). The ring is nominally bound to USART2, but Richie never calls
+`uart_init()` on it, so nothing leaves the chip on a pin. The host drains it over **USB control
+request `0xe0` with `param1 = 0`** (`get_ring_by_number(0)`, `main_comms.h:276`) — the same channel
+panda's own boot banner and fault messages use, so lwIP prints simply interleave with them.
+
+Two consequences worth knowing: `putch` discards characters when the ring is full and returns no
+error, so a chatty `LWIP_DEBUG` build will silently drop output — keep debug categories narrow.
+And because the ring is only drained when the host polls, prints emitted before USB enumeration
+(anything during `lwip_stack_init`) survive only if they fit in those 1024 bytes.
 
 ---
 
