@@ -9,7 +9,11 @@
 #include "board/drivers/harness.h"
 #include "board/drivers/fan.h"
 #include "board/stm32h7/llfan.h"
+#ifdef RICHIE
+#include "board/stm32h7/sound_stubs.h"
+#elif
 #include "board/stm32h7/sound.h"
+#endif
 #include "board/drivers/fake_siren.h"
 #include "board/drivers/clock_source.h"
 #include "board/boards/red.h"
