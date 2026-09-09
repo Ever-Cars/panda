@@ -42,6 +42,9 @@ int main(void) {
   current_board->set_panda_power(true);
 #endif
 #ifdef RICHIE
+  set_gpio_mode(GPIOA, 5, MODE_INPUT);
+  set_gpio_pullup(GPIOA, 5, PULL_DOWN);
+  for (volatile int i = 0; i < PULL_EFFECTIVE_DELAY; i++);
   if (get_gpio_input(GPIOA, 5) == 1) {
     soft_flasher_start();
   }

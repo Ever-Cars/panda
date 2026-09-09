@@ -83,10 +83,12 @@ static void enter_stop_mode(void) {
   register_clear_bits(&(RCC->AHB3LPENR), RCC_AHB3LPENR_AXISRAMLPEN);
 
   // SBU pins to input for EXTI wakeup
-  set_gpio_mode(current_board->harness_config->GPIO_SBU1,
-                current_board->harness_config->pin_SBU1, MODE_INPUT);
-  set_gpio_mode(current_board->harness_config->GPIO_SBU2,
-                current_board->harness_config->pin_SBU2, MODE_INPUT);
+  if (current_board->harness_config != NULL) {
+    set_gpio_mode(current_board->harness_config->GPIO_SBU1,
+                  current_board->harness_config->pin_SBU1, MODE_INPUT);
+    set_gpio_mode(current_board->harness_config->GPIO_SBU2,
+                  current_board->harness_config->pin_SBU2, MODE_INPUT);
+  }
 
   // EXTI1: SBU2 (PA1)
   // EXTI4: SBU1 (PC4)

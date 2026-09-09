@@ -61,11 +61,13 @@ void common_init_gpio(void) {
   set_gpio_pullup(GPIOB, 13, PULL_NONE);
 #endif
 
+#ifndef RICHIE_REV3
   set_gpio_pullup(GPIOB, 5, PULL_NONE);
   set_gpio_alternate(GPIOB, 5, GPIO_AF9_FDCAN2);
 
   set_gpio_pullup(GPIOB, 6, PULL_NONE);
   set_gpio_alternate(GPIOB, 6, GPIO_AF9_FDCAN2);
+#endif
 
 #ifndef RICHIE
   // G9,G10: FDCAN3

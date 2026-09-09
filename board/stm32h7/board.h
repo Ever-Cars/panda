@@ -15,7 +15,11 @@
 #include "board/boards/red.h"
 #include "board/boards/tres.h"
 #include "board/boards/cuatro.h"
-#include "board/boards/richie.h"
+#ifdef RICHIE_REV2
+  #include "board/boards/richie_rev2.h"
+#else
+  #include "board/boards/richie.h"
+#endif
 
 
 void detect_board_type(void) {

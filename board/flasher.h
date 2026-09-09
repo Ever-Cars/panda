@@ -40,11 +40,7 @@ int comms_control_handler(ControlPacket_t *req, uint8_t *resp) {
         flash_unlock();
         resp[1] = 0xff;
       }
-    #ifdef HW_RICHIE_REV1
-      led_set(LED_BLUE, 1);
-    #else
       led_set(LED_GREEN, 1);
-    #endif
       unlocked = true;
       prog_ptr = (uint32_t *)APP_START_ADDRESS;
       break;
@@ -204,31 +200,17 @@ void soft_flasher_start(void) {
     print("SPI initialized\n");
   }
 
-#ifdef HW_RICHIE_REV1
-  // LED footprint is incorrect. Green LED turns power on to LEDs when 0
-  led_set(LED_GREEN, 0);
-  led_set(LED_BLUE, 1);
-#else
   // green LED on for flashing
   led_set(LED_GREEN, 1);
-#endif
 
   enable_interrupts();
   print("Interrupts enabled\n");
 
   for (;;) {
     // blink the green LED fast
-  #ifdef HW_RICHIE_REV1
-    led_set(LED_BLUE, 0);
-  #else
     led_set(LED_GREEN, 0);
-  #endif
     delay(500000);
-  #ifdef HW_RICHIE_REV1
-    led_set(LED_BLUE, 1);
-  #else
     led_set(LED_GREEN, 1);
-  #endif
     delay(500000);
   }
 }

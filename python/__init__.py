@@ -157,7 +157,7 @@ def ensure_version(desc, lib_field, panda_field, fn):
   def wrapper(self, *args, **kwargs):
     lib_version = getattr(self, lib_field)
     panda_version = getattr(self, panda_field)
-    if lib_version != panda_version:
+    if panda_version != 0 and lib_version != panda_version:
       raise RuntimeError(f"{desc} packet version mismatch: panda's firmware v{panda_version}, library v{lib_version}. Reflash panda.")
     return fn(self, *args, **kwargs)
   return wrapper
@@ -713,6 +713,9 @@ class Panda:
 
   def set_obd(self, obd):
     self._handle.controlWrite(Panda.REQUEST_OUT, 0xdb, int(obd), 0, b'')
+
+  def set_doip_enabled(self, enabled):
+    self._handle.controlWrite(Panda.REQUEST_OUT, 0xb6, int(enabled), 0, b'')
 
   def set_can_loopback(self, enable):
     # set can loopback mode for all buses
