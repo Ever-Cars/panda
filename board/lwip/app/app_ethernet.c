@@ -57,8 +57,6 @@ void ethernet_link_status_updated(struct netif *netif)
     uint8_t iptxt[20];
     sprintf((char *)iptxt, "%s", ip4addr_ntoa(netif_ip4_addr(netif)));
     print("Static IP address: "); print((char *)iptxt); print("\n");
-    BSP_LED_On(LED1);
-    BSP_LED_Off(LED2);
 #endif /* LWIP_DHCP */
   }
   else
@@ -68,8 +66,6 @@ void ethernet_link_status_updated(struct netif *netif)
     DHCP_state = DHCP_LINK_DOWN;
 #else
     print("The network cable is not connected\n");
-    BSP_LED_Off(LED1);
-    BSP_LED_On(LED2);
 #endif /* LWIP_DHCP */
   }
 }
@@ -110,8 +106,6 @@ void DHCP_Process(struct netif *netif)
     case DHCP_START:
     {
       print("  State: Looking for DHCP server ...\n");
-      BSP_LED_Off(LED1);
-      BSP_LED_Off(LED2);
       ip_addr_set_zero_ip4(&netif->ip_addr);
       ip_addr_set_zero_ip4(&netif->netmask);
       ip_addr_set_zero_ip4(&netif->gw);
@@ -127,8 +121,6 @@ void DHCP_Process(struct netif *netif)
         DHCP_state = DHCP_ADDRESS_ASSIGNED;
         sprintf((char *)iptxt, "%s", ip4addr_ntoa(netif_ip4_addr(netif)));
         print("IP address assigned by a DHCP server: "); print((char *)iptxt); print("\n");
-        BSP_LED_On(LED1);
-        BSP_LED_On(LED2);
       }
       else
       {
@@ -148,8 +140,6 @@ void DHCP_Process(struct netif *netif)
           sprintf((char *)iptxt, "%s", ip4addr_ntoa(netif_ip4_addr(netif)));
           print("DHCP Timeout !! \n");
           print("Static IP address: "); print((char *)iptxt); print("\n");
-          BSP_LED_On(LED1);
-          BSP_LED_Off(LED2);
         }
       }
     }
@@ -158,8 +148,6 @@ void DHCP_Process(struct netif *netif)
     {
       DHCP_state = DHCP_OFF;
       print("The network cable is not connected\n");
-      BSP_LED_Off(LED1);
-      BSP_LED_On(LED2);
     }
     break;
   default: break;
