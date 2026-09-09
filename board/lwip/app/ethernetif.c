@@ -86,8 +86,8 @@ __attribute__((section(".TxDescripSection"))) ETH_DMADescTypeDef  DMATxDscrTab[E
 
 #elif defined ( __GNUC__ ) /* GNU Compiler */
 
-ETH_DMADescTypeDef DMARxDscrTab[ETH_RX_DESC_CNT] __attribute__((section(".RxDescripSection"))); /* Ethernet Rx DMA Descriptors */
-ETH_DMADescTypeDef DMATxDscrTab[ETH_TX_DESC_CNT] __attribute__((section(".TxDescripSection")));   /* Ethernet Tx DMA Descriptors */
+ETH_DMADescTypeDef DMARxDscrTab[ETH_RX_DESC_CNT] __attribute__((aligned(32), section(".sram12.eth_desc"))); /* Ethernet Rx DMA Descriptors */
+ETH_DMADescTypeDef DMATxDscrTab[ETH_TX_DESC_CNT] __attribute__((aligned(32), section(".sram12.eth_desc"))); /* Ethernet Tx DMA Descriptors */
 
 #endif
 
@@ -102,7 +102,7 @@ extern u8_t memp_memory_RX_POOL_base[];
 __attribute__((section(".Rx_PoolSection"))) extern u8_t memp_memory_RX_POOL_base[];
 
 #elif defined ( __GNUC__ ) /* GNU Compiler */
-__attribute__((section(".Rx_PoolSection"))) extern u8_t memp_memory_RX_POOL_base[];
+__attribute__((aligned(32), section(".sram12.eth_rx"))) extern u8_t memp_memory_RX_POOL_base[];
 
 #endif
 
