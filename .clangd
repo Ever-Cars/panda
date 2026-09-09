@@ -1,0 +1,5 @@
+# Flags come from compile_commands.json (generate_compile_commands.py / scons).
+CompileFlags:
+  CompilationDatabase: .
+Index:
+  Background: Build
