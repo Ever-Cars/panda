@@ -18,7 +18,7 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "lwip/opt.h"
-#include "main.h"
+#include "lwip_app.h"
 #if LWIP_DHCP
 #include "lwip/dhcp.h"
 #endif
