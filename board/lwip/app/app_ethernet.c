@@ -55,7 +55,7 @@ void ethernet_link_status_updated(struct netif *netif)
     DHCP_state = DHCP_START;
 #else
     uint8_t iptxt[20];
-    sprintf((char *)iptxt, "%s", ip4addr_ntoa(netif_ip4_addr(netif)));
+    strcpy((char *)iptxt, ip4addr_ntoa(netif_ip4_addr(netif)));
     print("Static IP address: "); print((char *)iptxt); print("\n");
 #endif /* LWIP_DHCP */
   }
@@ -119,7 +119,7 @@ void DHCP_Process(struct netif *netif)
       if (dhcp_supplied_address(netif))
       {
         DHCP_state = DHCP_ADDRESS_ASSIGNED;
-        sprintf((char *)iptxt, "%s", ip4addr_ntoa(netif_ip4_addr(netif)));
+        strcpy((char *)iptxt, ip4addr_ntoa(netif_ip4_addr(netif)));
         print("IP address assigned by a DHCP server: "); print((char *)iptxt); print("\n");
       }
       else
@@ -137,7 +137,7 @@ void DHCP_Process(struct netif *netif)
           IP_ADDR4(&gw, GW_ADDR0, GW_ADDR1, GW_ADDR2, GW_ADDR3);
           netif_set_addr(netif, &ipaddr, &netmask, &gw);
 
-          sprintf((char *)iptxt, "%s", ip4addr_ntoa(netif_ip4_addr(netif)));
+          strcpy((char *)iptxt, ip4addr_ntoa(netif_ip4_addr(netif)));
           print("DHCP Timeout !! \n");
           print("Static IP address: "); print((char *)iptxt); print("\n");
         }
