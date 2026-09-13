@@ -288,6 +288,20 @@ extern void set_gpio_pullup(GPIO_TypeDef *GPIO, unsigned int pin, unsigned int m
    (drop `__FILE__`/`__LINE__` formatting); keep `LWIP_RAND() ((u32_t)rand())` and add
    **[CORRECTED]** `int rand(void);` — **not** `unsigned int`, which conflicts with the definition
    in `stdlib_minimal.c` and will not compile.
+
+   **[NEW] This edit is the single largest newlib dependency in the tree, not a nicety.**
+   `LWIP_NOASSERT` is unset in `lwipopts.h`, so `LWIP_ASSERT` is live and expands to
+   `LWIP_PLATFORM_ASSERT` — **477 call sites across the 22 compiled lwIP sources** (`tcp.c` 81,
+   `tcp_out.c` 69, `netif.c` 61, `mem.c` 45, ...). Every one of those objects would reference
+   `printf`. By comparison the three `sprintf` calls in `app_ethernet.c` are trivia. Consider
+   routing the assert to `fault_occurred()` rather than a bare hang so a failure is visible in
+   panda's health packet; `#define LWIP_NOASSERT 1` is the release-build option once bring-up is
+   done, and removes the references entirely.
+
+   The other formatted-output sites in the tree are already inert and need no work, but know where
+   they are in case an lwipopt turns them on: `mem.c:108,119` (`snprintf`, gated behind
+   `MEM_SANITY_REGION_BEFORE/AFTER_ALIGNED > 0`, both 0 by default), `arch.h` `lwip_platform_diag`
+   (`vsnprintf`, see item 5), and `ppp_impl.h`'s `ppp_slprintf` (PPP is never compiled).
 5. **[NEW] `middlewares/lwip/src/include/lwip/arch.h`** — the original plan missed this file
    entirely, and it is the one that actually matters for debug prints. It has been modified from
    stock lwIP and is included by **every** lwIP translation unit. Two edits:
