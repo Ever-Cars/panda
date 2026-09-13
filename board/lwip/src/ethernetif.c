@@ -24,6 +24,7 @@
 #include "netif/etharp.h"
 #include "ethernetif.h"
 #include "lan8742.h"
+#include "lwip_port.h"
 #include <string.h>
 
 /* Private typedef -----------------------------------------------------------*/
@@ -86,8 +87,8 @@ __attribute__((section(".TxDescripSection"))) ETH_DMADescTypeDef  DMATxDscrTab[E
 
 #elif defined ( __GNUC__ ) /* GNU Compiler */
 
-ETH_DMADescTypeDef DMARxDscrTab[ETH_RX_DESC_CNT] __attribute__((aligned(32), section(".sram12.eth_desc"))); /* Ethernet Rx DMA Descriptors */
-ETH_DMADescTypeDef DMATxDscrTab[ETH_TX_DESC_CNT] __attribute__((aligned(32), section(".sram12.eth_desc"))); /* Ethernet Tx DMA Descriptors */
+ETH_DMADescTypeDef DMARxDscrTab[ETH_RX_DESC_CNT] __attribute__((aligned(32), section(".sram4.eth_desc"))); /* Ethernet Rx DMA Descriptors */
+ETH_DMADescTypeDef DMATxDscrTab[ETH_TX_DESC_CNT] __attribute__((aligned(32), section(".sram4.eth_desc"))); /* Ethernet Tx DMA Descriptors */
 
 #endif
 
@@ -396,51 +397,51 @@ void HAL_ETH_MspInit(ETH_HandleTypeDef *heth)
         RMII_NRST -------------------------> PE0
   */
 
-  /* Enable GPIOs clocks */
-  __HAL_RCC_GPIOA_CLK_ENABLE();
-  __HAL_RCC_GPIOB_CLK_ENABLE();
-  __HAL_RCC_GPIOC_CLK_ENABLE();
-  __HAL_RCC_GPIOE_CLK_ENABLE();
-  __HAL_RCC_GPIOG_CLK_ENABLE();
-
   /* Configure PA1, PA2 , PA7 */
-  GPIO_InitStructure.Pin =  GPIO_PIN_1 | GPIO_PIN_2 | GPIO_PIN_7;
-  GPIO_InitStructure.Speed = GPIO_SPEED_FREQ_HIGH;
-  GPIO_InitStructure.Mode = GPIO_MODE_AF_PP;
-  GPIO_InitStructure.Pull = GPIO_NOPULL;
-  GPIO_InitStructure.Alternate = GPIO_AF11_ETH;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStructure);
+  set_gpio_pullup(GPIOA, 1, GPIO_NOPULL);
+  set_gpio_pullup(GPIOA, 2, GPIO_NOPULL);
+  set_gpio_pullup(GPIOA, 7, GPIO_NOPULL);
+  set_gpio_alternate(GPIOA, 1, GPIO_AF11_ETH);
+  set_gpio_alternate(GPIOA, 2, GPIO_AF11_ETH);
+  set_gpio_alternate(GPIOA, 7, GPIO_AF11_ETH);
+  register_set_bits(&(GPIOA->OSPEEDR), GPIO_OSPEEDR_OSPEED1 | GPIO_OSPEEDR_OSPEED2 | GPIO_OSPEEDR_OSPEED7);
 
   /* Configure PB10, PB11 */
-  GPIO_InitStructure.Pin = GPIO_PIN_10 | GPIO_PIN_11;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStructure);
+  set_gpio_pullup(GPIOB, 10, GPIO_NOPULL);
+  set_gpio_pullup(GPIOB, 11, GPIO_NOPULL);
+  set_gpio_alternate(GPIOB, 10, GPIO_AF11_ETH);
+  set_gpio_alternate(GPIOB, 11, GPIO_AF11_ETH);
+  register_set_bits(&(GPIOB->OSPEEDR), GPIO_OSPEEDR_OSPEED10 | GPIO_OSPEEDR_OSPEED11);
 
   /* Configure PC1, PC4 and PC5 */
-  GPIO_InitStructure.Pin = GPIO_PIN_1 | GPIO_PIN_4 | GPIO_PIN_5;
-  HAL_GPIO_Init(GPIOC, &GPIO_InitStructure);
+  set_gpio_pullup(GPIOC, 1, GPIO_NOPULL);
+  set_gpio_pullup(GPIOC, 4, GPIO_NOPULL);
+  set_gpio_pullup(GPIOC, 5, GPIO_NOPULL);
+  set_gpio_alternate(GPIOC, 1, GPIO_AF11_ETH);
+  set_gpio_alternate(GPIOC, 4, GPIO_AF11_ETH);
+  set_gpio_alternate(GPIOC, 5, GPIO_AF11_ETH);
+  register_set_bits(&(GPIOC->OSPEEDR), GPIO_OSPEEDR_OSPEED1 | GPIO_OSPEEDR_OSPEED4 | GPIO_OSPEEDR_OSPEED5);
 
   /* Configure PG13, PG14 */
-  GPIO_InitStructure.Pin = GPIO_PIN_13 | GPIO_PIN_14;
-  HAL_GPIO_Init(GPIOG, &GPIO_InitStructure);
+  set_gpio_pullup(GPIOG, 13, GPIO_NOPULL);
+  set_gpio_pullup(GPIOG, 14, GPIO_NOPULL);
+  set_gpio_alternate(GPIOG, 13, GPIO_AF11_ETH);
+  set_gpio_alternate(GPIOG, 14, GPIO_AF11_ETH);
+  register_set_bits(&(GPIOG->OSPEEDR), GPIO_OSPEEDR_OSPEED13 | GPIO_OSPEEDR_OSPEED14);
 
   /* Configure PE5 and PE0 */
-  GPIO_InitStructure.Pin = GPIO_PIN_0 | GPIO_PIN_5;
-  GPIO_InitStructure.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStructure.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(GPIOE, &GPIO_InitStructure);
-  HAL_GPIO_WritePin(GPIOE, GPIO_PIN_5, GPIO_PIN_SET);
+  set_gpio_pullup(GPIOE, 0, GPIO_NOPULL);
+  set_gpio_pullup(GPIOE, 5, GPIO_NOPULL);
+  set_gpio_mode(GPIOE, 0, MODE_OUTPUT);
+  set_gpio_mode(GPIOE, 5, MODE_OUTPUT);
+  set_gpio_output(GPIOE, 5, 1);
 
   // RMII reset sequence
-  HAL_GPIO_WritePin(GPIOE, GPIO_PIN_0, GPIO_PIN_SET);
+  set_gpio_output(GPIOE, 0, 1);
   HAL_Delay(100);
-  HAL_GPIO_WritePin(GPIOE, GPIO_PIN_0, GPIO_PIN_RESET);
+  set_gpio_output(GPIOE, 0, 0);
   HAL_Delay(100);
-  HAL_GPIO_WritePin(GPIOE, GPIO_PIN_0, GPIO_PIN_SET);
-
-  /* Enable Ethernet clocks */
-  __HAL_RCC_ETH1MAC_CLK_ENABLE();
-  __HAL_RCC_ETH1TX_CLK_ENABLE();
-  __HAL_RCC_ETH1RX_CLK_ENABLE();
+  set_gpio_output(GPIOE, 0, 1);
 }
 
 /*******************************************************************************
