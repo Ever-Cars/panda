@@ -19,6 +19,7 @@
 
 #include "app_ethernet.h"
 #include "ethernetif.h"
+#include "lwip_port.h"
 #include "tcp_echoserver.h"
 
 #define SRAM12_START 0x30000000UL
@@ -41,8 +42,11 @@ void lwip_clock_init(void) {
                   RCC_AHB1ENR_ETH1TXEN |
                   RCC_AHB1ENR_ETH1RXEN;
 
-  // Richie can provide the LAN8742 XI clock from the 25 MHz HSE on PA8.
-  HAL_RCC_MCOConfig(RCC_MCO1, RCC_MCO1SOURCE_HSE, RCC_MCODIV_1);
+  // Richie can provide the LAN8742 XI clock from the 25 MHz HSE on PA8 (MCO1 = HSE / 1).
+  set_gpio_pullup(GPIOA, 8, GPIO_NOPULL);
+  set_gpio_alternate(GPIOA, 8, GPIO_AF0_MCO);
+  register_set_bits(&(GPIOA->OSPEEDR), GPIO_OSPEEDR_OSPEED8);
+  register_set_bits(&(RCC->CFGR), RCC_CFGR_MCO1_1 | RCC_CFGR_MCO1PRE_0);
 }
 
 bool lwip_stack_init(void) {

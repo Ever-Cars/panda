@@ -434,14 +434,14 @@ void HAL_ETH_MspInit(ETH_HandleTypeDef *heth)
   set_gpio_pullup(GPIOE, 5, GPIO_NOPULL);
   set_gpio_mode(GPIOE, 0, MODE_OUTPUT);
   set_gpio_mode(GPIOE, 5, MODE_OUTPUT);
-  set_gpio_output(GPIOE, 5, 1);
+  set_gpio_output(GPIOE, 5, true);
 
   // RMII reset sequence
-  set_gpio_output(GPIOE, 0, 1);
+  set_gpio_output(GPIOE, 0, true);
   HAL_Delay(100);
-  set_gpio_output(GPIOE, 0, 0);
+  set_gpio_output(GPIOE, 0, false);
   HAL_Delay(100);
-  set_gpio_output(GPIOE, 0, 1);
+  set_gpio_output(GPIOE, 0, true);
 }
 
 /*******************************************************************************
