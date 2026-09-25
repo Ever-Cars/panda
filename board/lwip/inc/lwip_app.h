@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stdint.h>
 #include <stdbool.h>
 
 /*Static IP ADDRESS: IP_ADDR0.IP_ADDR1.IP_ADDR2.IP_ADDR3 */
@@ -21,7 +22,7 @@
 #define GW_ADDR3   ((uint8_t) 1U)
 
 // Configure clocks used only by Ethernet. Panda remains the system-clock owner.
-void lwip_clock_init();
+void lwip_clock_init(void);
 
 // Initialize and verify the linker-placed Ethernet DMA memory.
 bool lwip_dma_memory_init(void);
