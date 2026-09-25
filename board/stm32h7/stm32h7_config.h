@@ -15,6 +15,7 @@
 #define MCU_IDCODE 0x483U
 
 #define CORE_FREQ 240U // in Mhz
+#define CORE_CLOCK_HZ (CORE_FREQ*1000000U) // in Hz
 //APB1 - 120Mhz, APB2 - 120Mhz
 #define APB1_FREQ (CORE_FREQ/4U)
 #define APB1_TIMER_FREQ (APB1_FREQ*2U) // APB1 is multiplied by 2 for the timer peripherals

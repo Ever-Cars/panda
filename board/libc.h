@@ -7,6 +7,11 @@ __attribute__((aligned(32), noinline)) void delay(uint32_t a) {
   for (i = 0; i < n; i++) {}
 }
 
+void delay_ms(uint32_t ms) {
+  uint32_t start = millisecond_timer_get();
+  while ((millisecond_timer_get() - start) < ms) {}
+}
+
 void assert_fatal(bool condition, const char *msg) {
   if (!condition) {
     print("ASSERT FAILED\n");

@@ -1,3 +1,5 @@
+static volatile uint32_t milliseconds_count = 0U;
+
 static void timer_init(TIM_TypeDef *TIM, int psc) {
   register_set(&(TIM->PSC), (psc-1), 0xFFFFU);
   register_set(&(TIM->DIER), TIM_DIER_UIE, 0x5F5FU);
@@ -20,8 +22,25 @@ void microsecond_timer_init(void) {
   MICROSECOND_TIMER->EGR = TIM_EGR_UG;
 }
 
+void millisecond_timer_init(void) {
+  // Use systick as time base source and configure 1ms tick
+  // Set reload register
+  SysTick->LOAD = (uint32_t)((CORE_CLOCK_HZ/1000U) - 1UL);
+  // Set Priority for Systick Interrupt
+  NVIC_SetPriority(SysTick_IRQn, (1UL << __NVIC_PRIO_BITS) - 1UL);
+  // Load the SysTick Counter Value
+  SysTick->VAL = 0UL;
+  // Enable SysTick IRQ and SysTick Timer
+  SysTick->CTRL = SysTick_CTRL_CLKSOURCE_Msk | SysTick_CTRL_TICKINT_Msk | SysTick_CTRL_ENABLE_Msk;
+}
+
 uint32_t microsecond_timer_get(void) {
   return MICROSECOND_TIMER->CNT;
+}
+
+uint32_t millisecond_timer_get(void)
+{
+  return milliseconds_count;
 }
 
 void interrupt_timer_init(void) {
@@ -49,4 +68,8 @@ void can_spam_timer_init(void) {
 void isotp_timer_init(void) {
   timer_init_with_arr(ISOTP_TIMER, APB1_TIMER_FREQ, 999U);
   NVIC_EnableIRQ(ISOTP_TIMER_IRQ);
+}
+
+void SysTick_Handler(void) {
+  milliseconds_count++;
 }
