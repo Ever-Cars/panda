@@ -46,7 +46,7 @@
 #endif
 
 #include "arch/cc.h"
-#include "main_declarations.h"
+#include "lwip_port.h"
 
 /**
  * @defgroup compiler_abstraction Compiler/platform abstraction

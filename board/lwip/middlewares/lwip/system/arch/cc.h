@@ -40,6 +40,9 @@ typedef int sys_prot_t;
 
 #define LWIP_PROVIDE_ERRNO
 
+/* panda is -nostdlib; newlib's ctype.h exists but _ctype_ is not linked. */
+#define LWIP_NO_CTYPE_H 1
+
 #if defined (__GNUC__) & !defined (__CC_ARM)
 
 #define LWIP_TIMEVAL_PRIVATE 0
@@ -79,8 +82,13 @@ typedef int sys_prot_t;
 
 #endif
 
-#define LWIP_PLATFORM_ASSERT(x) do {printf("Assertion \"%s\" failed at line %d in %s\n", \
-                                     x, __LINE__, __FILE__); } while(0)
+extern void print(const char *a);
+extern void puth(unsigned int i);
+#define LWIP_PLATFORM_ASSERT(x) \
+do { \
+    print(x); print(" failed at line "); puth(__LINE__); \
+    print(" in "); print(__FILE__); print("\n"); \
+} while(0)
 
 /* Define random number generator function */
 #define LWIP_RAND() ((u32_t)rand())
