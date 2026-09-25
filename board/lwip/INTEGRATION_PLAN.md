@@ -421,6 +421,54 @@ the app image only. Jungle/body builds pass `lwip=False` implicitly.
    `tests/misra/test_misra.sh` only scans `board/main.c`, and cppcheck already passes
    `--suppress=*:*inc/*`, which `board/lwip/inc/lwip_app.h` matches.
 
+### [NEW] Rejected: calling `lwip_poll()` from `isotp_tick_handler` (TIM23, 1 kHz ISR)
+
+Considered and rejected. The motivation is sound — `MAX_LED_FADE` is 10240 and the main loop runs
+two fade loops per pass, each iteration calling a pair of `delay()` busy-waits, so a bare
+`lwip_poll()` at the top of `while (true)` executes only once per several hundred milliseconds,
+and with `ETH_RX_DESC_CNT = 4` plus a 6-buffer RX pool the ring overruns under any real traffic.
+A timer-driven poll is the right *shape* of answer; ISR **context** is what makes it wrong.
+
+Reasons, worst first:
+
+1. **The lwIP raw API is not reentrant.** `NO_SYS = 1` with `SYS_LIGHTWEIGHT_PROT = 0`
+   (`lwipopts.h:42,48`) means zero internal locking, and lwIP requires all raw-API calls come from
+   one context. It would be safe only while `lwip_poll()` is the sole caller — which forecloses
+   calling `tcp_write`/`udp_send` for DoIP from main-loop or comms-handler context. The failure
+   mode is silent pbuf/memp corruption, not a clean error.
+2. **Priority-0 ISR blocking safety-relevant work.** Panda only deprioritizes SPI (`llspi.h` sets
+   DMA2_Stream2/3 and SPI4); TIM23, TIM12, FDCAN1/2/3 and OTG_HS all sit at the default priority 0,
+   and equal priorities cannot preempt each other. A long `lwip_poll()` therefore stalls FDCAN RX
+   (frame loss on FIFO overrun), USB, and the TIM12 8 Hz tick — which is what calls
+   `simple_watchdog_kick()`. Stall it past 375 ms and you trip `FAULT_HEARTBEAT_LOOP_WATCHDOG`.
+3. **`lwip_poll()` is unbounded work, not a 1 ms job.** `ethernetif_input()` drains the whole RX
+   ring in a `do/while` with the full IP/TCP path and app callbacks per packet;
+   `sys_check_timeouts()` can fire the TCP slow timer and walk every PCB doing retransmits; and
+   every 100 ms `Ethernet_Link_Periodic_Handle()` does MDIO reads via `HAL_ETH_ReadPHYRegister`,
+   busy-polling `MACMDIOAR` at ~2.5 MHz, with an error path that can call `HAL_ETH_Stop`/`Start`.
+4. **Overruns fail silently.** `isotp_tick_handler` clears `ISOTP_TIMER->SR = 0U` unconditionally
+   at the end (`main.c:287`), so a tick arriving mid-ISR is swallowed and ISO-TP timing (STmin,
+   N_Ar/N_Bs — all ms-scale) degrades with no error. The rate-limit fault does **not** catch this:
+   `REGISTER_INTERRUPT(ISOTP_TIMER_IRQ, ..., 1500U, ...)` has 50% headroom over 1 kHz and overruns
+   produce *missed* ticks, not extra ones.
+5. **Two concrete correctness bugs.** `HAL_GetTick()` (Phase 2) keeps non-atomic static state and
+   is documented "called only from the main-loop polling context" — from an ISR the accumulator
+   races and HAL/lwIP timers lose time. And `print()` on lwIP's assert and link paths runs
+   `injectc()` inside `ENTER_CRITICAL`/`EXIT_CRITICAL`, which mutates a global depth counter and
+   calls `__enable_irq()` on exit; workable in ISR context but fragile.
+6. **Breaks a diagnostic.** `handle_interrupt()` accumulates `busy_time` for every ISR and
+   publishes `interrupt_load` in the health packet (`main_comms.h`); moving the network stack into
+   an ISR makes the board report near-total interrupt load.
+
+**Decision: keep the current design** — `lwip_poll()` in the `while (true)` loop and once inside
+each LED-fade `for` loop (item 3 above). If cadence proves insufficient during bring-up, the
+ordered fallbacks are: (a) flag-in-ISR, work-in-thread — the tick handler sets a
+`volatile bool lwip_poll_pending` and the main loop services it, keeping all lwIP calls in thread
+mode; (b) shorten or compile out the LED fade for the Ethernet build, since the fade *is* the gap;
+(c) go interrupt-driven on RX via `REGISTER_INTERRUPT(ETH_IRQn, ...)` with the ISR only clearing
+DMA status and setting a flag. Option (c) is the idiomatic long-term answer; "no NVIC work needed"
+in the Verified Facts is a bring-up simplification, not a constraint.
+
 ---
 
 ## Phase 6 — Bring-up & verification order
