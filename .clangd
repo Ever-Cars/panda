@@ -1,5 +1,21 @@
-# Flags come from compile_commands.json (generate_compile_commands.py / scons).
+# Flags come from compile_commands.json (scons compilation_db tool).
 CompileFlags:
   CompilationDatabase: .
 Index:
   Background: Build
+---
+# Panda headers are not self-contained: they only compile after everything
+# board/main.c includes before them. Parse each header with the whole main.c
+# translation unit force-included so its types/macros/functions resolve.
+# Relative paths are resolved from the compile_commands.json "directory".
+If:
+  PathMatch: board/.*\.h
+  PathExclude: [board/flasher\.h, board/jungle/.*, board/body/.*]
+CompileFlags:
+  Add: [-include, board/main.c, -ferror-limit=0]
+---
+If:
+  PathMatch: board/flasher\.h
+CompileFlags:
+  Add: [-DBOOTSTUB, -include, board/bootstub.c, -ferror-limit=0]
+  
