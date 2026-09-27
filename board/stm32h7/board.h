@@ -11,7 +11,7 @@
 #include "board/stm32h7/llfan.h"
 #ifdef RICHIE
 #include "board/stm32h7/sound_stubs.h"
-#elif
+#else
 #include "board/stm32h7/sound.h"
 #endif
 #include "board/drivers/fake_siren.h"
