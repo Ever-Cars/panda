@@ -321,7 +321,6 @@ int main(void) {
   enable_fpu();
 
   microsecond_timer_init();
-  millisecond_timer_init();
 
   current_board->set_siren(false);
   if (current_board->has_fan) {

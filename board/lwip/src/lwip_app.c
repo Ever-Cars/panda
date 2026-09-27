@@ -28,6 +28,18 @@ uint8_t lwip_ram_heap[MEM_SIZE + 512U] __attribute__((aligned(32), section(".axi
 
 static struct netif lwip_netif;
 
+static void lwip_systic_init(void)
+{
+  // Use systick as time base source and configure 1ms tick
+  // Set reload register
+  SysTick->LOAD = (uint32_t)((CORE_CLOCK_HZ/1000U) - 1UL);
+  // Set Priority for Systick Interrupt
+  NVIC_SetPriority(SysTick_IRQn, (1UL << __NVIC_PRIO_BITS) - 1UL);
+  // Load the SysTick Counter Value
+  SysTick->VAL = 0UL;
+  // Enable SysTick IRQ and SysTick Timer
+  SysTick->CTRL = SysTick_CTRL_CLKSOURCE_Msk | SysTick_CTRL_TICKINT_Msk | SysTick_CTRL_ENABLE_Msk;
+}
 
 void lwip_clock_init(void) {
   // SYSCFG owns the MII/RMII selection.
@@ -49,6 +61,7 @@ bool lwip_stack_init(void) {
   ip_addr_t gateway;
 
   lwip_clock_init();
+  lwip_systic_init();
 
 #if LWIP_DHCP
   ip_addr_set_zero_ip4(&ipaddr);
