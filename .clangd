@@ -10,7 +10,7 @@ Index:
 # Relative paths are resolved from the compile_commands.json "directory".
 If:
   PathMatch: board/.*\.h
-  PathExclude: [board/flasher\.h, board/jungle/.*, board/body/.*]
+  PathExclude: [board/flasher\.h, board/jungle/.*, board/body/.*, board/lwip/.*]
 CompileFlags:
   Add: [-include, board/main.c, -ferror-limit=0]
 ---
@@ -18,4 +18,3 @@ If:
   PathMatch: board/flasher\.h
 CompileFlags:
   Add: [-DBOOTSTUB, -include, board/bootstub.c, -ferror-limit=0]
-  
