@@ -24,7 +24,7 @@
 #endif
 #include "app_ethernet.h"
 #include "ethernetif.h"
-#include "main_declarations.h"
+#include "lwip_port.h"
 
 /* Private typedef -----------------------------------------------------------*/
 /* Private define ------------------------------------------------------------*/

@@ -22,13 +22,9 @@
 #include "lwip_port.h"
 #include "tcp_echoserver.h"
 
-#define SRAM12_START 0x30000000UL
-#define SRAM12_SIZE  (32UL * 1024UL)
-#define AXISRAM_START 0x24000000UL
-#define AXISRAM_SIZE  (320UL * 1024UL)
 
 // mem.c needs MEM_SIZE plus allocator metadata and alignment headroom.
-uint8_t lwip_ram_heap[MEM_SIZE + 512U] __attribute__((aligned(32), section(".sram4.lwip_heap")));
+uint8_t lwip_ram_heap[MEM_SIZE + 512U] __attribute__((aligned(32), section(".axisram")));
 
 static struct netif lwip_netif;
 
@@ -38,9 +34,7 @@ void lwip_clock_init(void) {
   MODIFY_REG(SYSCFG->PMCR, SYSCFG_PMCR_EPIS_SEL, SYSCFG_ETH_RMII);
 
   // Enable only the Ethernet peripheral gates; do not alter PLLs or bus dividers.
-  RCC->AHB1ENR |= RCC_AHB1ENR_ETH1MACEN |
-                  RCC_AHB1ENR_ETH1TXEN |
-                  RCC_AHB1ENR_ETH1RXEN;
+  register_set_bits(&(RCC->AHB1ENR), RCC_AHB1ENR_ETH1MACEN | RCC_AHB1ENR_ETH1TXEN | RCC_AHB1ENR_ETH1RXEN);
 
   // Richie can provide the LAN8742 XI clock from the 25 MHz HSE on PA8 (MCO1 = HSE / 1).
   set_gpio_pullup(GPIOA, 8, GPIO_NOPULL);

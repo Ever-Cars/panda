@@ -36,7 +36,7 @@
 #define ETH_DMA_TRANSMIT_TIMEOUT                (20U)
 
 #define ETH_RX_BUFFER_SIZE            1536U
-#define ETH_RX_BUFFER_CNT             9U
+#define ETH_RX_BUFFER_CNT             6U
 #define ETH_TX_BUFFER_MAX             ((ETH_TX_DESC_CNT) * 2U)
 
 /* Private macro -------------------------------------------------------------*/
@@ -87,8 +87,8 @@ __attribute__((section(".TxDescripSection"))) ETH_DMADescTypeDef  DMATxDscrTab[E
 
 #elif defined ( __GNUC__ ) /* GNU Compiler */
 
-ETH_DMADescTypeDef DMARxDscrTab[ETH_RX_DESC_CNT] __attribute__((aligned(32), section(".sram4.eth_desc"))); /* Ethernet Rx DMA Descriptors */
-ETH_DMADescTypeDef DMATxDscrTab[ETH_TX_DESC_CNT] __attribute__((aligned(32), section(".sram4.eth_desc"))); /* Ethernet Tx DMA Descriptors */
+ETH_DMADescTypeDef DMARxDscrTab[ETH_RX_DESC_CNT] __attribute__((aligned(32), section(".axisram"))); /* Ethernet Rx DMA Descriptors */
+ETH_DMADescTypeDef DMATxDscrTab[ETH_TX_DESC_CNT] __attribute__((aligned(32), section(".axisram"))); /* Ethernet Tx DMA Descriptors */
 
 #endif
 
