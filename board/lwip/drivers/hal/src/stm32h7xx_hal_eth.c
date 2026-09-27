@@ -339,11 +339,11 @@ HAL_StatusTypeDef HAL_ETH_Init(ETH_HandleTypeDef *heth)
 
   if (heth->Init.MediaInterface == HAL_ETH_MII_MODE)
   {
-    HAL_SYSCFG_ETHInterfaceSelect(SYSCFG_ETH_MII);
+    MODIFY_REG(SYSCFG->PMCR, SYSCFG_PMCR_EPIS_SEL, SYSCFG_ETH_MII);
   }
   else
   {
-    HAL_SYSCFG_ETHInterfaceSelect(SYSCFG_ETH_RMII);
+    MODIFY_REG(SYSCFG->PMCR, SYSCFG_PMCR_EPIS_SEL, SYSCFG_ETH_RMII);
   }
 
   /* Dummy read to sync with ETH */
