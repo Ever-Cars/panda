@@ -232,7 +232,8 @@ static err_t low_level_output(struct netif *netif, struct pbuf *p)
     Txbuffer[i].len = q->len;
 
     /* Clean D-Cache before transmitting */
-    SCB_CleanDCache_by_Addr((uint32_t*)q->payload, q->len);
+    if (SCB->CCR & SCB_CCR_DC_Msk)
+      SCB_CleanDCache_by_Addr((uint32_t*)q->payload, q->len);
 
     if(i>0)
     {
@@ -590,7 +591,8 @@ void HAL_ETH_RxAllocateCallback(uint8_t **buff)
     pbuf_alloced_custom(PBUF_RAW, 0, PBUF_REF, p, *buff, ETH_RX_BUFFER_SIZE);
 
     /* Invalidate data cache prior to reception */
-    SCB_InvalidateDCache_by_Addr(*buff, ETH_RX_BUFFER_SIZE);
+    if (SCB->CCR & SCB_CCR_DC_Msk)
+      SCB_InvalidateDCache_by_Addr(*buff, ETH_RX_BUFFER_SIZE);
   }
   else
   {
@@ -632,7 +634,8 @@ void HAL_ETH_RxLinkCallback(void **pStart, void **pEnd, uint8_t *buff, uint16_t 
   }
 
   /* Invalidate data cache because Rx DMA's writing to physical memory makes it stale. */
-  SCB_InvalidateDCache_by_Addr((uint32_t *)buff, Length);
+  if (SCB->CCR & SCB_CCR_DC_Msk)
+    SCB_InvalidateDCache_by_Addr((uint32_t *)buff, Length);
 }
 
 void HAL_ETH_TxFreeCallback(uint32_t * buff)
