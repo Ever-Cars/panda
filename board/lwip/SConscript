@@ -1,0 +1,61 @@
+Import('env')
+
+lenv = env.Clone()
+# vendor code: keep ABI/codegen flags, relax panda's strictness
+lenv['CFLAGS'] = [f for f in lenv['CFLAGS'] if f not in ('-Werror', '-Wextra', '-Wstrict-prototypes', '-fmax-errors=1')]
+lenv.Append(CFLAGS=['-Wno-unused-parameter', '-DUSE_HAL_DRIVER'])
+lenv.Prepend(CPPPATH=[
+  Dir('inc'),
+  Dir('app'),
+  Dir('drivers/hal/inc'),        # must precede board/stm32h7/inc (hal_def.h / hal_gpio_ex.h basename overlap)
+  Dir('drivers/lan8742'),
+  Dir('middlewares/lwip/src/include'),
+  Dir('middlewares/lwip/system'),
+])
+
+sources = [
+  'src/lwip_app.c',
+  'src/lwip_port.c',
+  'src/app_ethernet.c',
+  'src/ethernetif.c',
+  'src/tcp_echoserver.c',
+  'drivers/lan8742/lan8742.c',
+  'drivers/hal/src/stm32h7xx_hal_eth.c',
+  'drivers/hal/src/stm32h7xx_hal_gpio.c',
+  'drivers/hal/src/stm32h7xx_hal_rcc.c',
+  'middlewares/libc/memmove.c',
+  'middlewares/libc/strcmp.c',
+  'middlewares/libc/strlen.c',
+  'middlewares/libc/strncmp.c',
+  'middlewares/libc/stdlib_minimal.c',
+] + [f'middlewares/lwip/src/core/{f}' for f in (
+  'init.c',
+  'def.c',
+  'inet_chksum.c',
+  'ip.c',
+  'mem.c',
+  'memp.c',
+  'netif.c',
+  'pbuf.c',
+  'stats.c',
+  'sys.c',
+  'tcp.c',
+  'tcp_in.c',
+  'tcp_out.c',
+  'timeouts.c',
+  'udp.c',
+  'raw.c',
+  'dns.c',
+)] + [f'middlewares/lwip/src/core/ipv4/{f}' for f in (
+  'autoip.c',
+  'dhcp.c',
+  'etharp.c',
+  'icmp.c',
+  'igmp.c',
+  'ip4.c',
+  'ip4_addr.c',
+  'ip4_frag.c',
+)] + ['middlewares/lwip/src/netif/ethernet.c']
+
+lwip_objs = [lenv.Object(s) for s in sources]
+Return('lwip_objs')
