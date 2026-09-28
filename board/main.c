@@ -25,6 +25,9 @@
 
 #include "board/can_comms.h"
 #include "board/main_comms.h"
+#ifdef HAS_DOIP
+#include "board/lwip/inc/lwip_app.h"
+#endif
 
 #ifdef RICHIE
   #define BOARD_NAME "RICHIE"
@@ -359,9 +362,17 @@ int main(void) {
 
   print("**** INTERRUPTS ON ****\n");
   enable_interrupts();
+#ifdef HAS_DOIP
+  print("Initializing LwIP\n");
+  // Enable LwIP stack for DoIP
+  lwip_stack_init();
+#endif
 
   // LED should keep on blinking all the time
   while (true) {
+    #ifdef HAS_DOIP
+    lwip_poll();
+    #endif
     #ifdef ALLOW_DEBUG
     if (stop_mode_requested) {
       enter_stop_mode();
@@ -377,6 +388,9 @@ int main(void) {
           delay(fade >> 4);
           led_set(LED_RED, false);
           delay((MAX_LED_FADE - fade) >> 4);
+          #ifdef HAS_DOIP
+          lwip_poll();
+          #endif
         }
 
         for (uint32_t fade = MAX_LED_FADE; fade > 0U; fade -= 1U) {
@@ -384,6 +398,9 @@ int main(void) {
           delay(fade >> 4);
           led_set(LED_RED, false);
           delay((MAX_LED_FADE - fade) >> 4);
+          #ifdef HAS_DOIP
+          lwip_poll();
+          #endif
         }
 
       #ifdef DEBUG_FAULTS
