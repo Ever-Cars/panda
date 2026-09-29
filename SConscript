@@ -68,7 +68,7 @@ def to_c_uint32(x):
   return "{" + 'U,'.join(map(str, nums)) + "U}"
 
 
-def build_project(project_name, project, main, extra_flags):
+def build_project(project_name, project, main, extra_flags, lwip=False):
   project_dir = Dir(f'./board/obj/{project_name}/')
 
   flags = project["FLAGS"] + extra_flags + common_flags + [
@@ -94,6 +94,7 @@ def build_project(project_name, project, main, extra_flags):
     AS=PREFIX + 'gcc',
     OBJCOPY=PREFIX + 'objcopy',
     OBJDUMP=PREFIX + 'objdump',
+    SIZE=PREFIX + 'size',
     OBJPREFIX=project_dir,
     CFLAGS=flags,
     ASFLAGS=flags,
@@ -119,14 +120,21 @@ def build_project(project_name, project, main, extra_flags):
   ])
   bs_env.Objcopy(f"./board/obj/bootstub.{project_name}.bin", bs_elf)
 
+  # Add lwip objects if needed
+  lwip_objs = []
+  if lwip:
+    lwip_objs = SConscript('board/lwip/SConscript', exports={'env': env})
+
   # Build + sign main (aka app)
   main_elf = env.Program(f"{project_dir}/main.elf", [
     startup,
     main
-  ], LINKFLAGS=[f"-Wl,--section-start,.isr_vector={project['APP_START_ADDRESS']}"] + flags)
+  ] + lwip_objs, LINKFLAGS=[f"-Wl,--section-start,.isr_vector={project['APP_START_ADDRESS']},--print-memory-usage"] + flags)
   main_bin = env.Objcopy(f"{project_dir}/main.bin", main_elf)
   sign_py = File(f"./board/crypto/sign.py").srcnode().relpath
   env.Command(f"./board/obj/{project_name}.bin.signed", main_bin, f"SETLEN=1 {sign_py} $SOURCE $TARGET {cert_fn}")
+
+  env.AddPostAction(main_elf, Action(f'$SIZE $TARGET', 'Size: $TARGET'))
 
 
 
@@ -183,7 +191,7 @@ common_flags += [f"-DHEALTH_PACKET_VERSION=0x{hh:08X}U", f"-DCAN_PACKET_VERSION_
                  f"-DJUNGLE_HEALTH_PACKET_VERSION=0x{jh:08X}U"]
 
 # panda fw (default: richie_rev3)
-build_project("panda_h7", base_project_h7, "./board/main.c", ['-DRICHIE', '-DRICHIE_REV3'])
+build_project("panda_h7", base_project_h7, "./board/main.c", ['-DRICHIE', '-DRICHIE_REV3', '-DHAS_DOIP'], lwip=True)
 
 # panda fw rev2 (legacy, uncomment if needed)
 # build_project("panda_h7_rev2", base_project_h7, "./board/main.c", ['-DRICHIE', '-DRICHIE_REV2'])
