@@ -1,530 +1,575 @@
-# lwIP Integration Plan
+# lwIP Integration
 
-Branch: `feat/lwip` · Target: `panda_h7` (Richie rev3) · Written 2026-08-27 · Revised 2026-09-08
+Branch: `feat/lwip` · Target: `panda_h7` (Richie rev3, STM32H735) · Revised 2026-09-28
 
 Goal: integrate the `board/lwip/` tree (ST lwIP + HAL ETH demo drop) into the panda firmware as a
 static library with a small wrapper API, removing everything that duplicates the existing codebase.
 Changes outside `lwip/` are kept minimal (SConscript hook, a few guarded lines in `board/main.c`,
 and one CAN buffer constant — see Phase 5).
 
-**Revision note (2026-09-08):** this document has been corrected against both codebases. Three of
-the original "verified facts" about RAM were wrong, one hard blocker (panda's register integrity
-checker) was missing, and the document had drifted from the working tree, where `app/lwip.c` and
-`inc/lwip_app.h` already exist. Corrections are marked **[CORRECTED]** and **[NEW]** below.
+The `board/lwip/` tree started as an ST lwIP + HAL ETH demo drop. It is now built as a set of extra
+objects linked into the panda **app** image only (never the bootstub), with a small wrapper API.
+Everything that duplicated panda was deleted. Changes outside `lwip/` are limited to the list in
+"Changes outside `board/lwip/`".
 
 ---
 
-## Verified facts this plan is built on
+## Architecture at a glance
 
-- **Build model**: each firmware is a single translation unit (`board/main.c` + all headers) built by
-  `panda/SConscript` → `build_project()`. `panda_h7` is already the Richie build (`-DRICHIE`).
-  Flags: `-nostdlib -fno-builtin -Werror -Wextra -Wstrict-prototypes -fmax-errors=1`, no
-  `--gc-sections` — so every symbol referenced by a linked object must exist, and non-`static`
-  functions in panda's headers (e.g. `print` in `drivers/uart.h:114`, `microsecond_timer_get` in
-  `drivers/timers.h:23`, the `set_gpio_*` helpers in `drivers/gpio.h`) are **linkable external
-  symbols** the lwip library can call.
-- **Caches are off** (no `SCB_EnableI/DCache` anywhere outside lwip) → no MPU regions, no
-  cache-coherency work. The demo's cache-maintenance calls in `ethernetif.c` are harmless: CMSIS
-  guards them on `__DCACHE_PRESENT` (a compile-time core property), so they execute, but
-  clean/invalidate against a disabled cache is architecturally a no-op.
-- **`.bss`/`.data` live in DTCM (0x20000000), which ETH DMA cannot access.** Neither can it reach
-  ITCM. The linker script (`board/stm32h7/stm32h7x5_flash.ld`) provides `.axisram` (0x24000000,
-  320K), `.sram12` (0x30000000, 32K) and `.sram4` (0x38000000, 16K) output sections, collected by
-  `*(.axisram*)` / `*(.sram12*)` / `*(.sram4*)`, so dotted sub-section names like
-  `.sram12.eth_desc` already match. `stm32h7/peripherals.h:105` enables the D2 SRAM clocks.
-  **[CORRECTED] Every DMA-reachable region is nearly full — see "RAM budget" below.**
-- **ETH runs in polling mode** (`HAL_ETH_Start` + `HAL_ETH_ReadData` from `ethernetif_input`) →
-  **no ETH interrupt, no `SysTick`, no NVIC work needed**. The only time base needed is
-  `HAL_GetTick()`, and it can be served from the free-running TIM2, so it works before
-  `enable_interrupts()`.
-- The RMII pin map in `HAL_ETH_MspInit` is already adapted for the Richie rev3 board (PE0=PHY reset,
-  PE5=PHY power, PB10/PB11/PG13/PG14 TX side) and does **not** conflict with any pin used in
-  `boards/richie.h`. All of PA1/PA2/PA7/PA8, PB10/PB11, PC1/PC4/PC5, PE0/PE5, PG13/PG14 are free.
-  **[NEW] But the pins cannot be configured with `HAL_GPIO_Init` — see blocker below.**
-- Panda's `stm32h7/inc/stm32h7xx.h` selects the device from `-DSTM32H735xx` (already passed) and
-  has the `#if defined (USE_HAL_DRIVER) #include "stm32h7xx_hal.h"` block at line 222, so passing
-  `-DUSE_HAL_DRIVER` to lwip sources only (Phase 4) works; panda's TU never sees that define.
-
-### Known landmines
-
-- `app_ethernet.c` calls `sprintf` (won't link under `-nostdlib`).
-- `cc.h` maps `LWIP_PLATFORM_ASSERT` to `printf` (same problem).
-- `lwipopts.h` hardcoded the heap at `0x30004000` (already fixed in the working tree).
-- `microsecond_timer_get()` wraps every ~71.6 min (a naive `/1000` tick breaks HAL timeouts).
-- **[NEW]** `stdlib_minimal.c` defines `int rand(void)`. Declaring `unsigned int rand(void)` in
-  `cc.h` is a conflicting declaration and will not compile. Use `int rand(void);`.
-- **[NEW]** `PBUF_POOL_SIZE` is unset, so lwIP defaults to 16; with `PBUF_POOL_BUFSIZE 1536` that
-  is ~24.8K of DTCM `.bss` the zero-copy RX path never touches.
+- **lwIP raw API, `NO_SYS = 1`, `SYS_LIGHTWEIGHT_PROT = 0`.** No RTOS and no internal locking, so
+  every lwIP call must come from one context: the panda main loop.
+- **Polled Ethernet.** No ETH interrupt. `lwip_poll()` drains the RX ring, runs lwIP timers, and
+  runs the link and DHCP state machines.
+- **Zero-copy RX.** The ETH DMA writes straight into buffers from a dedicated lwIP memory pool
+  (`RX_POOL`), which are handed to the stack as custom pbufs. TX pbufs come from the lwIP heap and
+  are read directly by the DMA. Both therefore live in DMA-reachable RAM.
+- **Hardware checksums** for IP/UDP/TCP (`CHECKSUM_BY_HARDWARE`); ICMP checksums are generated in
+  software.
+- **Time base:** SysTick at 1 kHz, owned by the lwip port (`HAL_GetTick()` returns the counter).
+- **Features enabled:** IPv4, ARP, ICMP, UDP, TCP (10 PCBs, MSS 1460, 4×MSS send buffer and
+  window), DHCP with a static fallback, link-state callback. Netconn and socket APIs are off.
+  **IPv6 is not enabled**; see "Enabling IPv6".
+- **Demo service:** the ST TCP echo server on port 7 (`tcp_echoserver.c`) is still started.
 
 ---
 
-## [NEW] Blocker: panda's register integrity checker
+## Source layout (what is compiled)
 
-Panda's GPIO helpers record whole registers into `register_map` with a **full `0xFFFFFFFF` mask**:
+| Path | Role |
+|---|---|
+| `inc/lwip_app.h` | Public API included by `board/main.c`: `lwip_stack_init()`, `lwip_poll()`, `lwip_clock_init()`, static-IP / netmask / gateway macros, `CORE_CLOCK_HZ`. Kept free of HAL and lwIP includes so panda's strict TU can include it. |
+| `inc/lwip_port.h` | `extern` prototypes for the panda symbols the lwip tree calls (`print`, `set_gpio_*`, `register_set`, `register_set_bits`), so no lwip file includes panda headers. |
+| `inc/lwipopts.h` | lwIP configuration. |
+| `inc/stm32h7xx_hal_conf.h` | HAL config: `HSE_VALUE` 25 MHz, 4 RX + 4 TX descriptors, MAC address. |
+| `src/lwip_app.c` | Stack bring-up and poll loop; ETH clock/MCO setup; SysTick setup; owns `lwip_ram_heap`. |
+| `src/lwip_port.c` | Replaces the deleted HAL/CMSIS scaffolding: `SysTick_Handler`, `HAL_GetTick`, `HAL_Delay`, `HAL_InitTick` stub, and `SystemCoreClock` / `SystemD2Clock` / `D1CorePrescTable` / `uwTickPrio`. |
+| `src/ethernetif.c` | lwIP netif driver: descriptors, RX pool, `HAL_ETH_MspInit` (pins, PHY power/reset), PHY I/O glue, link-state handling. |
+| `src/app_ethernet.c` | Link-status and DHCP state machine, with prints through panda's `print()`. |
+| `src/tcp_echoserver.c` | ST demo echo server (port 7). |
+| `drivers/lan8742/` | LAN8742 PHY driver. |
+| `drivers/hal/src/` | Only `stm32h7xx_hal_eth.c`, `stm32h7xx_hal_rcc.c`, `stm32h7xx_hal_gpio.c`. |
+| `middlewares/libc/` | Only `memmove.c`, `strcmp.c`, `strlen.c`, `strncmp.c`, `stdlib_minimal.c` (for `rand`) are compiled. |
+| `middlewares/lwip/src/core`, `core/ipv4`, `netif/ethernet.c` | lwIP core. `raw.c`, `dns.c`, `autoip.c`, `igmp.c` and `stats.c` compile to near-empty objects with the current options. |
 
-```c
-// board/drivers/gpio.h:18 (set_gpio_mode), :48 (set_gpio_alternate), :58 (set_gpio_pullup)
-register_set(&(GPIO->MODER), tmp, 0xFFFFFFFFU);
-```
+Why these three HAL sources:
 
-`check_registers()` re-verifies every recorded register at 1 Hz from the tick handler
-(`board/main.c:258`) and calls `fault_occurred(FAULT_REGISTER_DIVERGENT)` on any mismatch.
+- `hal_eth.c` is the MAC/DMA driver.
+- `hal_rcc.c` provides `HAL_RCC_GetHCLKFreq()`, which `HAL_ETH_SetMDIOClockRange()` uses to pick
+  the MDC divider. It reads the real prescalers from the registers, so panda's clock setup gives
+  the correct answer.
+- `hal_gpio.c` is not called by the lwip code. It is linked only because `hal_rcc.c`'s
+  (unused) `HAL_RCC_MCOConfig()` references `HAL_GPIO_Init()`, and the build has no
+  `--gc-sections`.
 
-`HAL_ETH_MspInit`'s `HAL_GPIO_Init` touches **GPIOA** (PA1/PA2/PA7, plus PA8 for MCO1), **GPIOB**
-(PB10/PB11) and **GPIOE** (PE0/PE5). All three banks are already in the register map from
-`gpio_usb_init`, `richie_init`, the FDCAN pins, `led_init` and `gpio_spi_init`. The firmware would
-fault **within one second** of bringing Ethernet up.
+The HAL headers under `drivers/hal/inc/` intentionally shadow the same-named ones in
+`board/stm32h7/inc/` (`stm32h7xx_hal_def.h`, `stm32h7xx_hal_gpio_ex.h`), so the HAL `.c` files see
+their matching versions. This is handled by include-path order in `board/lwip/SConscript`, and
+panda's TU never sees the lwip HAL directory. CMSIS and device headers come from
+`board/stm32h7/inc/`.
 
-**Resolution (panda's system configuration wins):** configure every ETH pin through panda's helpers
-so the register map stays in sync. Two supporting notes:
+### Removed from the original drop
 
-- Panda has no `OSPEEDR` helper, and RMII needs `VERY_HIGH`. Writing `GPIOx->OSPEEDR` directly is
-  safe: panda only `register_set_bits` it for GPIOE pins 11-14 (`peripherals.h`), so every ETH pin
-  falls outside the recorded mask.
-- `HAL_RCC_MCOConfig` writes `RCC->CFGR` bits 18-24, while panda's
-  `register_set(&RCC->CFGR, RCC_CFGR_SW_PLL1, 0x7U)` masks only bits 0-2 — that call is already
-  safe and can stay.
+| Deleted | Replaced by |
+|---|---|
+| `app/main.c` | `src/lwip_app.c`; panda's `clock_init()` / startup own the MPU, caches, clocks and HAL init |
+| `app/stm32h7xx_it.c`, `inc/stm32h7xx_it.h` | panda's interrupt handlers and faults (this also removed the `OTG_HS_IRQHandler` and core-exception symbol clashes) |
+| `drivers/usb/` | panda's USB stack, and `print()` from `drivers/uart.h` |
+| `drivers/bsp/` (Richie BSP, LEDs, MCO1) | panda's LED driver and `boards/richie.h`; MCO1 setup moved into `lwip_clock_init()` |
+| `drivers/cmsis/` (including `system_stm32h7xx.c`) | `board/stm32h7/inc/`; the three globals `hal_rcc.c` needs live in `lwip_port.c` |
+| `drivers/hal/src/stm32h7xx_hal.c`, `_cortex.c`, `_pwr_ex.c`, `_rcc_ex.c` | `lwip_port.c` and direct register writes (for example, `HAL_SYSCFG_ETHInterfaceSelect()` in `hal_eth.c` became a `MODIFY_REG` on `SYSCFG->PMCR`) |
+| `middlewares/sys/` (`syscalls.c`, `sysmem.c`) | nothing (newlib scaffolding, unused) |
+| `inc/main.h`, `inc/richie_conf.h`, `inc/utilities_conf.h` | `inc/lwip_app.h`; nothing for the other two |
 
----
-
-## [CORRECTED] RAM budget
-
-All figures are analytical; confirm against the real `.map` at the first successful link.
-`sizeof(CANPacket_t)` is 72 (verified with the compiler against the local opendbc checkout the
-build actually uses: 6-byte head + 64-byte data, `__attribute__((packed, aligned(4)))`).
-
-**AXISRAM — 320K (327,680 B), currently 319,500 used, ~8.0K free.** The original plan claimed
-"~150K+ free"; that was wrong by a factor of ~19, and the 14,848-byte lwIP heap overflows the
-region at link time.
-
-- `elems_rx_q[4096]` — `can_common.h:25` — 4096 × 72 = **294,912 B**
-- `elems_isotp_tx_q[3]` + `elems_isotp_rx_q[3]` — `isotp.h:153,161` — 2 × 3 × 4,098 = **24,588 B**
-
-**SRAM12 — 32K (32,768 B), currently 20,488 used, ~12.3K free.**
-
-- `spi_buf_rx` + `spi_buf_tx` — `drivers/spi.h:7-8` — **8,192 B**
-- `isotp_read_staging_buffer` **4,100 B** + `isotp_write_staging_buffer` **8,196 B** — `isotp.h:169-170`
-
-**SRAM4 — 16K, currently 14,192 used, ~2.2K free.** `stm32h7/sound.h:5-8` puts four audio/mic DMA
-buffers here. They are dead weight on Richie (`board_richie` sets `.set_amp_enabled =
-unused_set_amp_enabled` and never calls `sound_init()`), but `sound.h` is included unconditionally
-from `stm32h7/board.h` and `sound_tick()` is called unconditionally, so the linker keeps them.
-**Not used by this plan** — left alone deliberately, and it remains the natural reclaim if more
-DMA-reachable RAM is ever needed.
-
-**ITCM — 64K**, holds `can_tx1_q` + `can_tx2_q` (59,904 B). Not DMA-reachable, irrelevant here.
-
-**What lwIP needs**, against ~22.6K of total free DMA-reachable RAM — a ~6.5K shortfall that must
-be closed regardless of placement:
-
-- `lwip_ram_heap[MEM_SIZE + 512]` — **14,848 B**, DMA-read (TX pbufs)
-- `memp_memory_RX_POOL_base` — `ETH_RX_BUFFER_CNT` × `sizeof(RxBuff_t)` (1,568 B), DMA-written
-- `DMARxDscrTab` + `DMATxDscrTab` — 2 × 4 × 24 B + alignment ≈ **224 B**
-
-### Resolution
-
-1. **Reduce the CAN RX ring** in `board/drivers/can_common.h:20`:
-   `#define CAN_RX_BUFFER_SIZE 3840U` (was `4096U`), freeing **18,432 B** of AXISRAM.
-   Safe: `can_push`/`can_pop` use explicit compare-and-wrap (`if ((q->w_ptr + 1U) == q->fifo_size)`),
-   not modulo, so a non-power-of-two size is fine, and the constant is referenced nowhere else.
-2. **Heap stays in AXISRAM** (`.axisram.lwip_heap`) at the full `MEM_SIZE` of 14K → **~11.5K spare**.
-3. **RX pool stays in SRAM12** (D2-local, on the ETH DMA's own bus matrix — the line-rate DMA-write
-   path is where domain locality matters most) but at **`ETH_RX_BUFFER_CNT = 6`**, not 9. At 9 the
-   pool is 14,112 B and overflows SRAM12 by ~2K; at 6 it is 9,408 B and the region ends with ~2.6K
-   spare. 6 is still above `ETH_RX_DESC_CNT` (4), which ST requires.
-4. **`PBUF_POOL_SIZE 0`** reclaims ~24.8K of DTCM `.bss` that the zero-copy design never uses.
-
-Escape hatch: AXISRAM has ~11.5K spare after step 2, enough to host the RX pool at CNT=6 if SRAM12
-turns out tighter than calculated. Prefer keeping it in SRAM12.
-
-**Step 0 (do first): commit the working tree as the reviewable baseline** — the untracked
-`generate_compile_commands.py`, the modified `SConstruct`, `board/lwip/app/lwip.c`,
-`board/lwip/inc/lwip_app.h`, and the `ethernetif.c` / `lwipopts.h` edits — so every deletion and
-rename below is reviewable as a diff.
+The demo sources were also moved from `app/` to `src/`.
 
 ---
 
-## Phase 1 — Delete duplicates (use the panda codebase instead)
+## Build integration
 
-| Delete from `lwip/` | Replaced by | Notes |
-|---|---|---|
-| `app/main.c` | existing `app/lwip.c` | `MPU_Config`/`CPU_CACHE_Enable`/`SystemClock_Config`/`HAL_Init` all drop — panda's `clock_init()`/`early_init` own that. `Netif_Config`, the poll-loop body and the MCO1 config already live in `lwip.c`. |
-| `app/stm32h7xx_it.c`, `inc/stm32h7xx_it.h` | `stm32h7/interrupt_handlers.h`, `sys/faults.h` | Kills the `OTG_HS_IRQHandler` and core-exception-handler symbol clashes, and the `SysTick_Handler`/`HAL_IncTick` time base we replace in Phase 2. |
-| `drivers/usb/` (entire dir: `usb_core.c/.h`, `usb_debug.c/.h`, `usb_hw.h`) | `drivers/usb.h` + `stm32h7/llusb.h`; `print`/`putch`/`puth`/`puthx` from `drivers/uart.h` | Kills `usb_init`/`usb_irqhandler` clashes. `usb_debug.h`'s four prototypes are byte-identical to panda's, so the swap is a pure `#include` change — see Phase 2's `lwip_port.h` and Phase 3 item 5. Five files include `usb_debug.h`; three (`app/main.c`, `usb_core.c`, `usb_debug.c`) are deleted here, leaving **`lwip/arch.h:49`** and `app/app_ethernet.c` to edit. |
-| `drivers/bsp/` (entire dir: `richie.c/.h`, `richie_errno.h`) | `drivers/led.h` + `boards/richie.h` | BSP LED driver duplicates panda's LED driver on the same PE2/3/4 pins. `BSP_MCO1_Init` content is already folded into `lwip.c`. Also resolves the `richie.h` filename collision. |
-| `drivers/cmsis/` (entire dir, incl. `system_stm32h7xx.c`) | `stm32h7/inc/` via include path | CMSIS headers are byte-identical duplicates. The three objects `hal_rcc.c` needs from `system_stm32h7xx.c` (`SystemCoreClock`, `SystemD2Clock`, `D1CorePrescTable`) move into the port file (Phase 2). This also guarantees `SystemInit` never reappears (panda's startup deliberately doesn't call it). |
-| `middlewares/libc/`: `memcpy.c`, `memset.c`, `memcpy-armv7m.S`, `strlen-armv7.S`, `strcmp-armv7.S`, `aeabi_memclr.c`, `aeabi_memcpy.c`, `aeabi_memmove.S`, `aeabi_memset.S` | `libc.h` (`memcpy`/`memset`/`memcmp`) | Direct symbol clashes (C and asm variants). GCC with panda's flags emits plain `memcpy`/`memset` calls, never `__aeabi_*`, so the aeabi shims go too. **Keep**: `memmove.c`, `strcmp.c`, `strlen.c`, `strncmp.c`, `stdlib_minimal.c` (provides `rand` for `LWIP_RAND`), `arm_asm.h`, `newlib_string_local.h` — panda has no implementations of these. |
-| `middlewares/sys/` (`syscalls.c`, `sysmem.c`) | nothing (newlib scaffolding for `printf`/`malloc`, unused once `sprintf` is removed) | |
-| `middlewares/lwip/system/OS/sys_arch.c` | nothing | Entire body is `#if !NO_SYS` + needs `cmsis_os.h` which doesn't exist here; `sys_now()` is already provided by `ethernetif.c`. |
-| `inc/richie_conf.h`, `inc/utilities_conf.h` | nothing (unreferenced after BSP deletion) | |
-| HAL sources except three: delete `stm32h7xx_hal.c`, `_cortex.c`, `_pwr_ex.c`, `_rcc_ex.c` | panda register-level drivers / the port file | **Keep only** `stm32h7xx_hal_eth.c`, `stm32h7xx_hal_gpio.c`, `stm32h7xx_hal_rcc.c` (`hal_rcc.c` is needed for `HAL_RCC_GetHCLKFreq` — MDIO clock divider — and `HAL_RCC_MCOConfig`; it reads the real prescalers from registers, so panda-configured clocks give the right 120 MHz answer). `hal_gpio.c` stays even though ETH pins now go through panda's helpers: `HAL_GPIO_WritePin`/`ReadPin` are still used for the PHY reset/power sequencing. |
-| HAL headers: prune `stm32h7xx_hal_conf.h` module list to `HAL_MODULE_ENABLED`, `ETH`, `GPIO`, `RCC`, `FLASH` (FLASH header-only: `hal_rcc.c` uses `__HAL_FLASH_*` latency macros); then delete headers outside the resulting include closure (`_cortex.h`, `_dma*.h`, `_exti.h`, `_pwr*.h`, `Legacy/*eth*_legacy.h`) | | Keep: `stm32h7xx_hal.h`, `_def.h`, `_eth.h`, `_rcc.h` + `_rcc_ex.h` (included by `_rcc.h`), `_gpio.h` + `_gpio_ex.h`, `_flash.h` + `_flash_ex.h`, `Legacy/stm32_hal_legacy.h` (included by `_def.h`). Let compile errors finalize the exact closure — re-keep a header if demanded, but never add a fourth `.c`. |
-| Optional cruft: `middlewares/lwip/src/apps/http/` (`fs.c`, `fsdata.c/.h`) | nothing — HTTP demo leftovers, unreferenced | Delete or leave unbuilt. `src/api/` (netconn/sockets) stays on disk but is **not compiled** (`NO_SYS=1`); keep for a future RTOS move. |
+### `board/lwip/SConscript`
 
-**Intentional non-dedup**: `stm32h7xx_hal_def.h` and `stm32h7xx_hal_gpio_ex.h` exist in *both*
-`lwip/drivers/hal/inc/` and `stm32h7/inc/`. These are related (same ST lineage, different
-snapshots), so they aren't renamed — but they also shouldn't be merged: the HAL `.c` files must see
-their own matching versions. Handled purely by include-path ordering (Phase 4):
-`lwip/drivers/hal/inc` comes **before** `stm32h7/inc` for lwip-library compilation only; the panda
-TU never sees the lwip HAL dir.
+It clones the panda firmware env, so objects inherit the exact codegen flags
+(`-mcpu=cortex-m7 -mhard-float -mfpu=fpv5-d16 -Os`), `-DSTM32H735xx`, the board defines
+(including `-DHAS_DOIP`), and the `board/stm32h7/inc` include path. For the vendor code it then:
 
----
+- removes `-Werror`, `-Wextra`, `-Wstrict-prototypes` and `-fmax-errors=1`;
+- adds `-Wno-unused-parameter` and `-DUSE_HAL_DRIVER` (lwip objects only, so panda's TU never sees
+  the HAL);
+- prepends `inc`, `drivers/hal/inc`, `drivers/lan8742`, `middlewares/lwip/src/include` and
+  `middlewares/lwip/system` to `CPPPATH` (`drivers/hal/inc` must come before
+  `board/stm32h7/inc`).
 
-## Phase 2 — New and existing wrapper files (all inside `lwip/`)
+It returns the list of objects.
 
-### `lwip/app/lwip.c` + `lwip/inc/lwip_app.h` — **already written**
+Object placement: `OBJPREFIX` is the project directory **without a trailing slash**, so objects
+land flat as `board/obj/panda_h7<basename>.o`. No two compiled sources may share a basename.
 
-**[CORRECTED]** The original plan proposed `app/eth_main.c` and `inc/eth_main.h`. Those names are
-dropped: the working tree already has `app/lwip.c` and `inc/lwip_app.h` providing
-`lwip_stack_init()`, `lwip_poll()`, `lwip_clock_init()` and the `lwip_ram_heap` symbol, plus a
-runtime `lwip_dma_memory_init()` that range-checks every DMA buffer against its intended region —
-a genuine improvement over the original design, since a mis-sectioned buffer returns `false`
-instead of failing silently.
+### `panda/SConscript`
 
-Two bugs to fix in that existing code:
+- `build_project(..., lwip=False)` gains a flag. When it is set, the lwip `SConscript` is called
+  with the app `env` and its objects are appended to the `main.elf` sources. The bootstub env is
+  untouched.
+- `-Wl,--print-memory-usage` is added to the app link, and a `$SIZE` post-action prints section
+  sizes after every link. Use these to watch the RAM budget.
+- The `panda_h7` build passes `['-DRICHIE', '-DRICHIE_REV3', '-DHAS_DOIP']` with `lwip=True`.
 
-1. `lwip_app.h` declares `void lwip_platform_clock_init(bool enable_phy_mco, bool
-   enable_io_compensation);` but `lwip.c` defines `void lwip_clock_init(void)`. Reconcile to one
-   name and signature; today any caller of the declared name gets an undefined symbol.
-2. `lwip_clock_init()` calls `HAL_RCC_MCOConfig` but the PA8 pin setup is missing (it was in the
-   deleted `BSP_MCO1_Init`). Add it using panda's helpers per the blocker section.
+### Tooling (not firmware)
 
-`lwip_dma_memory_init()`'s `SRAM12_START` / `AXISRAM_START` constants stay as-is under the Phase 1
-resolution (heap in AXISRAM, descriptors and RX pool in SRAM12).
-
-### `lwip/app/lwip_port.c` — everything the deleted HAL/CMSIS scaffolding used to provide
-
-```c
-#include "stm32h7xx_hal.h"
-extern uint32_t microsecond_timer_get(void);   // panda, drivers/timers.h (TIM at 1MHz, wraps ~71.6min)
-
-// wrap-safe ms tick; called only from the main-loop polling context.
-// Works before enable_interrupts(): TIM2 free-runs, it is not interrupt-driven.
-uint32_t HAL_GetTick(void) {
-  static uint32_t last_us = 0, carry_us = 0, ms = 0;
-  uint32_t now = microsecond_timer_get();
-  carry_us += (now - last_us);      // unsigned math survives the 32-bit wrap
-  last_us = now;
-  ms += carry_us / 1000U;
-  carry_us %= 1000U;
-  return ms;
-}
-void HAL_Delay(uint32_t d) { uint32_t s = HAL_GetTick(); while ((HAL_GetTick() - s) < (d + 1U)); }
-
-// referenced by linked-but-unused hal_rcc.c code (no --gc-sections)
-uint32_t SystemCoreClock = 240000000U;
-uint32_t SystemD2Clock  = 120000000U;
-const uint8_t D1CorePrescTable[16] = {0,0,0,0,1,2,3,4,1,2,3,4,6,7,8,9};
-uint32_t uwTickPrio = 0U;
-HAL_StatusTypeDef HAL_InitTick(uint32_t prio) { (void)prio; return HAL_OK; }
-```
-
-Note the heap array itself already lives in `lwip.c`, not here.
-
-### `lwip/inc/lwip_port.h`
-
-Declares the panda symbols lwip code needs, so no lwip file has to include panda headers (which
-would drag in the whole firmware world). This is the **only** replacement `usb_debug.h` needs:
-panda's `drivers/uart.h` exports the same four debug functions with **byte-identical signatures**
-(compare `drivers/usb/usb_debug.h:20-24` against `drivers/drivers.h:271-274`), so no call site in
-the lwip tree changes — only `#include` lines.
-
-```c
-#include <stdbool.h>
-#include <stdint.h>
-
-// drivers/uart.h — same four prototypes usb_debug.h declared, so every existing
-// print()/puth() call site in the lwip tree keeps working unchanged.
-void putch(const char a);
-void print(const char *a);
-void puthx(uint32_t i, uint8_t len);
-void puth(unsigned int i);
-
-// drivers/gpio.h — used instead of HAL_GPIO_Init so panda's register_map stays in sync.
-// Constants mirror board/drivers/gpio.h; keep in step if that file ever changes.
-#define PANDA_MODE_OUTPUT 1U
-#define PANDA_MODE_ALTERNATE 2U
-#define PANDA_PULL_NONE 0U
-#define PANDA_OUTPUT_TYPE_PUSH_PULL 0U
-extern void set_gpio_mode(GPIO_TypeDef *GPIO, unsigned int pin, unsigned int mode);
-extern void set_gpio_output(GPIO_TypeDef *GPIO, unsigned int pin, bool enabled);
-extern void set_gpio_output_type(GPIO_TypeDef *GPIO, unsigned int pin, unsigned int output_type);
-extern void set_gpio_alternate(GPIO_TypeDef *GPIO, unsigned int pin, unsigned int mode);
-extern void set_gpio_pullup(GPIO_TypeDef *GPIO, unsigned int pin, unsigned int mode);
-```
+- `generate_compile_commands.py`, called from `SConstruct`, replaces SCons' `compilation_db`
+  tool. The stock tool only records linked objects and misses the lwip tree.
+- `.clangd` force-includes `board/main.c` when parsing panda headers, excluding `board/lwip/`.
+- `.gitignore` now ignores `.cache` (the clangd index).
 
 ---
 
-## Phase 3 — Edits to existing `lwip/` files
+## Runtime integration
 
-1. **[CORRECTED] `inc/main.h`**: the original plan renamed this to `eth_main.h`. Instead just
-   **delete it** — `lwip_app.h` is the public header, and `lwip.c` already carries its own
-   `LWIP_IP_ADDR*`/`NETMASK`/`GATEWAY` macros. Update the `#include "main.h"` in `app_ethernet.c`
-   to `"lwip_app.h"`. `lwip_app.h` must stay free of HAL/lwip includes so panda's TU (compiled
-   `-Werror -Wstrict-prototypes`) can include it safely; it already is.
-2. **`app/ethernetif.c`**:
-   - Descriptor sections `.RxDescripSection`/`.TxDescripSection` → `.sram12.eth_desc` — **done**.
-   - **Still outstanding**: move the `__attribute__((aligned(32), section(".sram12.eth_rx"))) extern
-     u8_t memp_memory_RX_POOL_base[];` declaration (currently line 105) **above**
-     `LWIP_MEMPOOL_DECLARE(RX_POOL, ...)` (currently line 95). GCC ignores a section attribute
-     applied to an already-defined object, so as it stands the pool lands in DTCM where ETH DMA
-     cannot reach it. Drop the IAR/MDK branches while you're there.
-   - **[CORRECTED]** Set `ETH_RX_BUFFER_CNT` to **6** (from 9) — required, not a fallback. See the
-     RAM budget.
-   - **[NEW]** Replace the `HAL_GPIO_Init` calls in `HAL_ETH_MspInit` with panda's helpers:
-     `set_gpio_alternate(GPIOx, pin, 11)` + `set_gpio_pullup(..., PANDA_PULL_NONE)` for the ten
-     RMII pins (PA1/PA2/PA7, PB10/PB11, PC1/PC4/PC5, PG13/PG14), and
-     `set_gpio_output` / `set_gpio_output_type` for PE5 (PHY power) and PE0 (PHY reset). Write
-     `GPIOx->OSPEEDR` directly for `VERY_HIGH` speed. Keep the `__HAL_RCC_ETH1*_CLK_ENABLE()` calls
-     and the `HAL_GPIO_WritePin` reset sequencing as-is.
-   - Keep `#include <string.h>`; `memset`/`offsetof` calls resolve to panda's symbols at link.
-3. **`app/app_ethernet.c`**: replace `#include "usb_debug.h"` and `#include "main.h"` with
-   `"lwip_port.h"`/`"lwip_app.h"`; **delete all `BSP_LED_*` calls** (panda's main loop owns the
-   LEDs; link status is visible via prints); **remove `sprintf`** — `ip4addr_ntoa()` already returns
-   a printable static string:
-   `print("IP: "); print(ip4addr_ntoa(netif_ip4_addr(netif))); print("\n");`.
-4. **`system/arch/cc.h`**: remove `#include <stdio.h>`/`<stdlib.h>`/`<sys/time.h>`; replace the
-   `printf`-based `LWIP_PLATFORM_ASSERT` with `extern void print(const char*);` + print-and-hang
-   (drop `__FILE__`/`__LINE__` formatting); keep `LWIP_RAND() ((u32_t)rand())` and add
-   **[CORRECTED]** `int rand(void);` — **not** `unsigned int`, which conflicts with the definition
-   in `stdlib_minimal.c` and will not compile.
+### `board/main.c` (all guarded by `#ifdef HAS_DOIP`)
 
-   **[NEW] This edit is the single largest newlib dependency in the tree, not a nicety.**
-   `LWIP_NOASSERT` is unset in `lwipopts.h`, so `LWIP_ASSERT` is live and expands to
-   `LWIP_PLATFORM_ASSERT` — **477 call sites across the 22 compiled lwIP sources** (`tcp.c` 81,
-   `tcp_out.c` 69, `netif.c` 61, `mem.c` 45, ...). Every one of those objects would reference
-   `printf`. By comparison the three `sprintf` calls in `app_ethernet.c` are trivia. Consider
-   routing the assert to `fault_occurred()` rather than a bare hang so a failure is visible in
-   panda's health packet; `#define LWIP_NOASSERT 1` is the release-build option once bring-up is
-   done, and removes the references entirely.
+- `#include "board/lwip/inc/lwip_app.h"`.
+- `lwip_stack_init()` is called **after `enable_interrupts()`**. This is required: `HAL_Delay()` and
+  every HAL timeout depend on the SysTick interrupt.
+- `lwip_poll()` is called at the top of the `while (true)` loop and once per iteration of each of
+  the two LED-fade loops. In power-save mode the loop sits in `__WFI()`, which SysTick wakes every
+  1 ms, so polling continues.
 
-   The other formatted-output sites in the tree are already inert and need no work, but know where
-   they are in case an lwipopt turns them on: `mem.c:108,119` (`snprintf`, gated behind
-   `MEM_SANITY_REGION_BEFORE/AFTER_ALIGNED > 0`, both 0 by default), `arch.h` `lwip_platform_diag`
-   (`vsnprintf`, see item 5), and `ppp_impl.h`'s `ppp_slprintf` (PPP is never compiled).
-5. **[NEW] `middlewares/lwip/src/include/lwip/arch.h`** — the original plan missed this file
-   entirely, and it is the one that actually matters for debug prints. It has been modified from
-   stock lwIP and is included by **every** lwIP translation unit. Two edits:
-   - Line 49: `#include "usb_debug.h"` → `#include "lwip_port.h"`. Resolves via `Dir('inc')` on the
-     lwip CPPPATH (Phase 4). After the Phase 1 deletions this and `app_ethernet.c` are the only two
-     `usb_debug.h` includers left, and no call site needs touching because the prototypes match.
-   - Lines 81-95: `LWIP_PLATFORM_DIAG` is a `static inline lwip_platform_diag()` built on
-     `vsnprintf`, with `#include <stdio.h>`/`<stdlib.h>` alongside it. This does not break the build
-     today **only** because `LWIP_DEBUG` is unset in `lwipopts.h`, so `LWIP_DEBUGF` compiles away
-     and the unreferenced `static inline` is never emitted. The first time anyone enables
-     `LWIP_DEBUG` to chase a bug, the link fails on `vsnprintf` under `-nostdlib`. Replace it now
-     with a `print`-only version (drop the format arguments, or keep a tiny `%s`/`%d` handler) and
-     delete the two stdio includes, so lwIP's own debug output is usable when needed.
-6. **`inc/lwipopts.h`**:
-   - The `LWIP_RAM_HEAP_POINTER` symbol replacement is **done**.
-   - **[NEW]** Add `#define PBUF_POOL_SIZE 0` (or 2 as a safety net) — the default of 16 costs
-     ~24.8K of DTCM `.bss` that the zero-copy RX path never uses.
-   - All other memp pools (TCP PCBs etc., never DMA-touched) stay in DTCM `.bss` — no change.
-7. **`inc/stm32h7xx_hal_conf.h`**: trim modules per Phase 1; `HSE_VALUE` is already 25000000
-   (matches panda's crystal per `clock.h`) — leave it.
+Blocking inside `lwip_stack_init()` (about 200 ms of PHY reset) is harmless to the heartbeat
+watchdog: `simple_watchdog_kick()` runs from the 8 Hz tick interrupt, not from the main loop.
 
-### [NEW] Where lwIP debug output ends up
+### `lwip_stack_init()`
 
-Not a UART pin. Panda's `print()` calls `putch()`, which does
-`(void)injectc(&uart_ring_debug, a)` — a **1 KB software ring** (`FIFO_SIZE_INT 0x400`,
-`drivers/drivers.h:245`). The ring is nominally bound to USART2, but Richie never calls
-`uart_init()` on it, so nothing leaves the chip on a pin. The host drains it over **USB control
-request `0xe0` with `param1 = 0`** (`get_ring_by_number(0)`, `main_comms.h:276`) — the same channel
-panda's own boot banner and fault messages use, so lwIP prints simply interleave with them.
+1. `lwip_clock_init()`:
+   - selects RMII in `SYSCFG->PMCR`;
+   - enables `ETH1MAC`, `ETH1TX` and `ETH1RX` in `RCC->AHB1ENR` (through `register_set_bits`);
+   - drives MCO1 = HSE/1 = 25 MHz on PA8 (AF0, very-high speed) as the LAN8742 clock. The
+     `RCC->CFGR` MCO1 bits are set with `register_set_bits`.
+2. SysTick: reload `CORE_CLOCK_HZ / 1000`, lowest priority, interrupt enabled.
+3. `lwip_init()` and `netif_add(..., ethernetif_init, ethernet_input)`. With DHCP enabled the
+   netif starts with a zero address.
+4. `ethernetif_init()` calls `low_level_init()`:
+   - `HAL_ETH_Init()` calls `HAL_ETH_MspInit()`, which configures the pins and powers and resets
+     the PHY (PE5 high, then PE0 high/low/high with 100 ms steps). It then resets the DMA, which
+     needs the PHY's 50 MHz REF_CLK.
+   - The RX pool is initialized, the TX config is set to checksum and CRC/pad insertion, and
+     `LAN8742_Init()` scans MDIO addresses for the PHY. It has no multi-second wait.
+   - `ethernet_link_check_state()` starts the MAC/DMA only once the PHY reports link.
+5. The netif is set as the default, the link callback is registered, and the echo server is
+   started.
 
-Two consequences worth knowing: `putch` discards characters when the ring is full and returns no
-error, so a chatty `LWIP_DEBUG` build will silently drop output — keep debug categories narrow.
-And because the ring is only drained when the host polls, prints emitted before USB enumeration
-(anything during `lwip_stack_init`) survive only if they fit in those 1024 bytes.
+### `lwip_poll()`
+
+- `ethernetif_input()` reads frames until the RX ring is empty.
+- `sys_check_timeouts()` runs lwIP's TCP, ARP, DHCP and IP-reassembly timers.
+- `Ethernet_Link_Periodic_Handle()` checks the PHY link over MDIO every 100 ms. On link loss it
+  calls `HAL_ETH_Stop()` and brings the netif down. On link gain it applies the negotiated
+  speed/duplex and calls `HAL_ETH_Start()`.
+- `DHCP_Periodic_Handle()` runs the DHCP state machine every 500 ms. After 10 failed tries it
+  falls back to the static address `192.168.0.10/24` with gateway `192.168.0.1`.
+
+### Time base (`lwip_port.c`)
+
+`SysTick_Handler` increments a `volatile uint32_t systick`, and `HAL_GetTick()` returns it.
+`sys_now()`, the PHY driver tick, and all HAL timeouts use it. It replaced a panda-side
+`millisecond_timer_init()` / `SysTick_Handler` that previously lived in `drivers/timers.h`.
+
+Consequences:
+
+- `HAL_GetTick()` / `HAL_Delay()` never advance before `enable_interrupts()`, or inside
+  `ENTER_CRITICAL()`. Calling a HAL function with a timeout from either place hangs.
+- SysTick is a core exception, not an NVIC IRQ. It bypasses panda's `REGISTER_INTERRUPT`, so it
+  has no rate-limit fault and is not counted in `interrupt_load`. At 1 kHz with a one-line body,
+  this is negligible.
 
 ---
 
-## Phase 4 — Build integration
+## Panda register integrity checker
 
-### New file `board/lwip/SConscript`
+Panda records GPIO/RCC/timer register writes in `register_map`, and `check_registers()`
+re-verifies them at 1 Hz, raising `FAULT_REGISTER_DIVERGENT` on any mismatch. The GPIO helpers
+record `MODER`, `AFR` and `PUPDR` with a full `0xFFFFFFFF` mask. Any write to those registers that
+bypasses the helpers (for example, `HAL_GPIO_Init()`) makes the board fault within a second.
+
+As implemented, every pin is configured through panda's helpers:
+
+- RMII pins PA1 (REF_CLK), PA2 (MDIO), PA7 (CRS_DV), PB10 (RXER), PB11 (TX_EN), PC1 (MDC),
+  PC4/PC5 (RXD0/1) and PG13/PG14 (TXD0/1) use `set_gpio_pullup(NOPULL)` and
+  `set_gpio_alternate(AF11)`. Very-high speed is set through `register_set_bits(&GPIOx->OSPEEDR, ...)`.
+- PE5 (PHY power) and PE0 (PHY reset) use `set_gpio_mode(output)` and `set_gpio_output()`.
+- PA8 (MCO1) uses `set_gpio_alternate(AF0)`, and its speed is set through `register_set_bits`.
+- RCC bits (`AHB1ENR` ETH gates, `CFGR` MCO1) are set through `register_set_bits`, which only adds
+  those bits to the check mask.
+
+`SYSCFG->PMCR` is written directly with `MODIFY_REG`, both in `lwip_clock_init()` and in
+`HAL_ETH_Init()`. That is safe on Richie: only the jungle board records `PMCR` in the map. The
+`RCC->APB4ENR` write that `HAL_ETH_Init()` makes to enable the SYSCFG clock is also safe, because
+panda writes that register directly and never records it.
+
+---
+
+## Memory placement (measured)
+
+ETH DMA cannot reach DTCM (0x20000000, where `.bss`/`.data` live) or ITCM. Commit `01213b18`
+also established on hardware that it did not work from SRAM4, so the DMA buffers live in AXISRAM
+and SRAM12. Caches are disabled in panda. The demo's cache clean/invalidate calls in
+`ethernetif.c` now run only if `SCB->CCR.DC` is set, so they are inert today and become correct
+if the D-cache is ever enabled (at which point MPU regions would also be needed).
+
+| Region | Used / size | Free | Contents |
+|---|---|---|---|
+| AXISRAM `0x24000000` | 316,128 / 327,680 B (96.5%) | 11,552 B | CAN RX ring `elems_rx_q` 276,480 (3840 × 72 B); ISO-TP queues 24,588; **`lwip_ram_heap` 14,848** (`MEM_SIZE` 14K + 512 B headroom); **`DMARxDscrTab` / `DMATxDscrTab` 96 B each** |
+| SRAM12 `0x30000000` | 29,923 / 32,768 B (91.3%) | 2,845 B | ISO-TP staging buffers 8,200 + 4,100; SPI RX/TX 4,096 each; **`memp_memory_RX_POOL_base` 9,411** (6 × 1,568 B `RxBuff_t`) |
+| SRAM4 `0x38000000` | 0 / 16,384 B | 16,384 B | empty (see sound stubs below) |
+| DTCM `0x20000000` | 116,960 / 131,072 B (89.2%) | ~14,100 B | panda `.data`/`.bss`, plus about 28.7 KB of lwip `.bss` (all other memp pools, `EthHandle`, netif). The free space is the main stack; the linker only reserves 1.5 KB for heap and stack. |
+| ITCM | 59,904 / 65,536 B | | CAN TX queues; not DMA-reachable |
+| Flash (app) | 281,132 B (26.8%) | | lwip adds about 65 KB of text |
+
+How the budget was made to fit:
+
+1. **`CAN_RX_BUFFER_SIZE` reduced from 4096 to 3840** (`board/drivers/can_common.h`), freeing
+   18,432 B of AXISRAM for the heap and descriptors. Non-power-of-two is safe: `can_push` /
+   `can_pop` use compare-and-wrap, not modulo.
+2. **`ETH_RX_BUFFER_CNT` reduced from 9 to 6** so the RX pool fits in SRAM12. It must stay above
+   `ETH_RX_DESC_CNT` (4).
+3. The heap and descriptors use `section(".axisram")`. The RX pool uses `section(".sram12.eth_rx")`,
+   which the linker script collects with `*(.sram12*)`.
+
+Notes:
+
+- `.axisram` and `.sram12` are **NOLOAD**: the startup code does not zero them. That is fine for
+  these buffers, because `mem_init()`, `memp_init_pool()` and the HAL descriptor-list init all
+  initialize their memory. Do not put anything there that relies on zero-initialization.
+- The RX pool's section attribute sits on an `extern` redeclaration *after*
+  `LWIP_MEMPOOL_DECLARE`. With the current GCC it takes effect: `ethernetif.o` has a
+  `.sram12.eth_rx` section, and the pool links at `0x30005020`. It is still order-dependent; see
+  cleanup below.
+- `PBUF_POOL_SIZE` is unset, so it defaults to 16: `memp_memory_PBUF_POOL_base` is 24,835 B of
+  DTCM. The zero-copy RX path never allocates from it. The only `PBUF_POOL` user in the compiled
+  sources is a `udp.c` path gated behind `SO_REUSE`, which is off.
+
+### Sound stubs (Richie)
+
+`board/stm32h7/board.h` includes `board/stm32h7/sound_stubs.h` instead of `sound.h` under `RICHIE`.
+The stubs provide empty `sound_tick()`, `sound_init()`, `sound_init_dac()` and `sound_stop_dac()`,
+plus `sound_output_level`. This removes the four audio/mic DMA buffers that occupied about 14 KB
+of SRAM4. Richie never enables the amplifier, so no functionality is lost.
+
+---
+
+## libc and the `-nostdlib` build
+
+- `memcpy`, `memset` and `memcmp` resolve to panda's `libc.h`. The lwip tree adds only `memmove`,
+  `strcmp`, `strlen`, `strncmp`, and `rand`/`srand` (`stdlib_minimal.c`). The newlib-derived
+  `memcpy.c`, `memset.c`, `aeabi_*` and `*.S` files remain on disk but are not built.
+- `sprintf` was removed from `app_ethernet.c`; addresses are printed with
+  `print(ip4addr_ntoa(...))`.
+- `cc.h`:
+  - `LWIP_PLATFORM_ASSERT` prints the message, line and file through `print` / `puth`, then
+    **continues**.
+  - `LWIP_NO_CTYPE_H` avoids newlib's unlinked `_ctype_`.
+  - `LWIP_RAND()` is `rand()`.
+  - The `<stdio.h>`, `<stdlib.h>` and `<sys/time.h>` includes remain; they are header-only and
+    link nothing.
+- `lwip/arch.h` includes `lwip_port.h` (it previously included `usb_debug.h`).
+  `LWIP_PLATFORM_DIAG` still uses `vsnprintf`. It compiles away only because `LWIP_DEBUG` is
+  unset. **Enabling `LWIP_DEBUG` fails the link** unless `lwip_platform_diag` is first rewritten
+  to use `print`.
+- The build needs no `-lgcc`; no 64-bit division helpers are referenced.
+
+### Where debug output goes
+
+`print()` writes into panda's 1 KB `uart_ring_debug` software ring. Characters are dropped silently
+when the ring is full. The host drains the ring over USB control request `0xe0` with `param1 = 0`,
+the same channel as panda's boot banner, so lwIP and link/DHCP prints interleave with panda's
+output. Anything printed before USB enumeration survives only if it fits in the ring.
+
+---
+
+## Design decision: poll from the main loop, not from an ISR
+
+We considered calling `lwip_poll()` from the 1 kHz ISO-TP timer ISR and rejected it:
+
+1. The raw API is not reentrant (`NO_SYS = 1`, no locking). An ISR-driven stack would forbid any
+   `tcp_write` / `udp_send` from thread context, such as DoIP handlers. Violations cause silent
+   pbuf/memp corruption.
+2. All relevant IRQs (TIM23, TIM12 tick, FDCAN, OTG_HS) share priority 0. A long poll would stall
+   CAN RX, USB, and the 8 Hz tick that kicks the heartbeat watchdog.
+3. `lwip_poll()` is unbounded work: it drains the whole RX ring, handles TCP retransmits, and
+   does MDIO busy-polls every 100 ms.
+4. ISO-TP ticks would be swallowed silently, because the handler clears `SR` unconditionally.
+   `interrupt_load` would also report near-total load.
+
+If polling cadence ever becomes insufficient, the fallbacks in order are:
+
+1. Have an ISR set a `volatile` flag that the main loop services.
+2. Shorten or compile out the LED fade in the Ethernet build.
+3. Use a `REGISTER_INTERRUPT(ETH_IRQn, ...)` handler that only clears the DMA status and sets a
+   flag.
+
+---
+
+## Changes outside `board/lwip/` (complete list)
+
+| File | Change |
+|---|---|
+| `SConscript` | lwip hook, `HAS_DOIP`, memory-usage print and size post-action (**uncommitted**) |
+| `SConstruct`, `generate_compile_commands.py`, `.clangd`, `.gitignore` | clangd tooling |
+| `board/main.c` | `HAS_DOIP`-guarded include, init and poll calls |
+| `board/drivers/can_common.h` | `CAN_RX_BUFFER_SIZE` 4096 → 3840 |
+| `board/drivers/timers.h` | removed `millisecond_timer_init()` and `SysTick_Handler` (moved to lwip) |
+| `board/libc.h` | removed `delay_ms()` (depended on the removed ms timer) |
+| `board/stm32h7/stm32h7_config.h` | removed `CORE_CLOCK_HZ` (now in `lwip_app.h`) |
+| `board/stm32h7/board.h`, `board/stm32h7/sound_stubs.h` | sound stubs for Richie |
+
+The jungle and body firmware still build with these changes (verified against `HEAD`'s
+`SConscript`).
+
+MISRA: `tests/misra/test_misra.sh` runs cppcheck on `board/main.c` without `-DHAS_DOIP`. The
+Ethernet code paths are therefore not MISRA-checked at all, and no suppressions were needed.
+
+---
+
+## Verification
+
+Build:
+
+- `scons` links with `--print-memory-usage`; compare against the table above.
+- The only lwip-side warning is an unused `GPIO_InitStructure` in `HAL_ETH_MspInit`.
+
+On hardware (done):
+
+- DHCP lease obtained; traffic works.
+
+Regression checklist for each change to this area:
+
+1. No `FAULT_REGISTER_DIVERGENT` after about 5 s of uptime (proves every pin write went through
+   the helpers).
+2. No `FAULT_HEARTBEAT_LOOP_WATCHDOG`.
+3. `ping <ip>`, and `nc <ip> 7` echoes.
+4. Unplugging and replugging the cable prints link-down, then a new DHCP lease.
+5. CAN RX under load (smaller ring), USB enumeration, and SPI (its buffers neighbour the RX pool in
+   SRAM12).
+
+---
+
+## Enabling IPv6 (not implemented)
+
+The stack is IPv4-only today:
+
+- `lwipopts.h` does not set `LWIP_IPV6`, so the `opt.h` default of `0` applies.
+- The ST drop does not contain `middlewares/lwip/src/core/ipv6/`. Only the IPv6 headers under
+  `src/include/lwip/` are present.
+- `main.elf` contains no `ip6`, `nd6`, `mld6` or `icmp6` symbols.
+- `ethernet_input()` drops incoming IPv6 frames.
+
+DoIP (ISO 13400) permits IPv6, but IPv4 is the norm for testers and vehicles. Only do this if the
+use case needs it. The steps below give a dual stack (IPv4 + IPv6).
+
+### 1. Add the IPv6 sources
+
+Copy `src/core/ipv6/` from upstream lwIP **2.1.2**, the version in `lwip/init.h`, into
+`middlewares/lwip/src/core/ipv6/`. Mixing versions breaks against the existing headers. Add the
+files to `board/lwip/SConscript`:
 
 ```python
-Import('env')
-
-lenv = env.Clone()
-# vendor code: keep ABI/codegen flags, relax panda's strictness
-lenv['CFLAGS'] = [f for f in lenv['CFLAGS'] if f not in ('-Werror', '-Wextra', '-Wstrict-prototypes', '-fmax-errors=1')]
-lenv.Append(CFLAGS=['-Wno-unused-parameter', '-DUSE_HAL_DRIVER'])
-lenv.Prepend(CPPPATH=[
-  Dir('inc'),
-  Dir('app'),
-  Dir('drivers/hal/inc'),        # must precede board/stm32h7/inc (hal_def.h / hal_gpio_ex.h basename overlap)
-  Dir('drivers/lan8742'),
-  Dir('middlewares/lwip/src/include'),
-  Dir('middlewares/lwip/system'),
-])
-
-sources = [
-  'app/lwip.c', 'app/lwip_port.c', 'app/app_ethernet.c', 'app/ethernetif.c', 'app/tcp_echoserver.c',
-  'drivers/lan8742/lan8742.c',
-  'drivers/hal/src/stm32h7xx_hal_eth.c', 'drivers/hal/src/stm32h7xx_hal_gpio.c', 'drivers/hal/src/stm32h7xx_hal_rcc.c',
-  'middlewares/libc/memmove.c', 'middlewares/libc/strcmp.c', 'middlewares/libc/strlen.c',
-  'middlewares/libc/strncmp.c', 'middlewares/libc/stdlib_minimal.c',
-] + [f'middlewares/lwip/src/core/{f}' for f in (
-  'init.c', 'def.c', 'inet_chksum.c', 'ip.c', 'mem.c', 'memp.c', 'netif.c', 'pbuf.c',
-  'stats.c', 'sys.c', 'tcp.c', 'tcp_in.c', 'tcp_out.c', 'timeouts.c', 'udp.c', 'raw.c', 'dns.c',
-)] + [f'middlewares/lwip/src/core/ipv4/{f}' for f in (
-  'autoip.c', 'dhcp.c', 'etharp.c', 'icmp.c', 'igmp.c', 'ip4.c', 'ip4_addr.c', 'ip4_frag.c',
+] + [f'middlewares/lwip/src/core/ipv6/{f}' for f in (
+  'dhcp6.c', 'ethip6.c', 'icmp6.c', 'inet6.c', 'ip6.c', 'ip6_addr.c', 'ip6_frag.c', 'mld6.c', 'nd6.c',
 )] + ['middlewares/lwip/src/netif/ethernet.c']
-
-lwip_objs = [lenv.Object(s) for s in sources]
-Return('lwip_objs')
 ```
 
-(`raw.c`/`dns.c`/`autoip.c`/`igmp.c`/`stats.c` compile to empty objects with the current opts —
-harmless, and they light up by flipping one lwipopt later. No two sources share a basename, which
-matters because `OBJPREFIX` is a directory path — verify object placement on the first build.)
+None of these basenames collide with existing objects, which matters because objects land flat in
+`board/obj/`.
 
-### `panda/SConscript` changes (~6 lines)
+### 2. `inc/lwipopts.h`
 
-```python
-def build_project(project_name, project, main, extra_flags, lwip=False):
-  ...
-  extra_objs = []
-  if lwip:
-    extra_objs = SConscript('./board/lwip/SConscript', exports={'env': env})
-  main_elf = env.Program(f"{project_dir}/main.elf", [startup, main] + extra_objs, ...)
-...
-build_project("panda_h7", base_project_h7, "./board/main.c", ['-DRICHIE', '-DENABLE_ETHERNET'], lwip=True)
+```c
+#define LWIP_IPV6                       1
+#define LWIP_IPV6_AUTOCONFIG            1   /* SLAAC from router advertisements */
+#define LWIP_IPV6_DHCP6                 0   /* enable only if the network requires DHCPv6 */
+#define LWIP_IPV6_NUM_ADDRESSES         3   /* link-local + up to 2 global */
+
+/* Trim the defaults (10/10/20) to keep DTCM usage down */
+#define LWIP_ND6_NUM_NEIGHBORS          4
+#define LWIP_ND6_NUM_DESTINATIONS       4
+#define MEMP_NUM_ND6_QUEUE              4
+#define MEMP_NUM_MLD6_GROUP             4
+
+/* Keep ICMPv6 checksums in software, matching the existing ICMP choice */
+#define CHECKSUM_GEN_ICMP6              1
+#define CHECKSUM_CHECK_ICMP6            1
 ```
 
-The cloned env inherits `OBJPREFIX` (objects land under `board/obj/panda_h7/`), the exact
-`-mcpu/-mfpu/-mhard-float/-Os` codegen flags, `-DSTM32H735xx`, and `CPPPATH` root +
-`board/stm32h7/inc` (the CMSIS dedup target). The bootstub env is untouched — lwip is linked into
-the app image only. Jungle/body builds pass `lwip=False` implicitly.
+TCP and UDP over IPv6 keep using hardware checksums. The `CHECKSUM_*_TCP/UDP 0` settings already
+cover both IP versions, and the H7 MAC's checksum offload handles IPv6 payloads.
+
+### 3. `src/ethernetif.c`, in `ethernetif_init()` / `low_level_init()`
+
+```c
+#if LWIP_IPV6
+  netif->output_ip6 = ethip6_output;
+  netif->flags |= NETIF_FLAG_MLD6;
+  netif_set_mld_mac_filter(netif, ethernetif_mld_mac_filter);  /* see step 4 */
+#endif
+```
+
+Add `#include "lwip/ethip6.h"`.
+
+### 4. Let IPv6 multicast through the MAC
+
+Neighbour discovery depends on multicast frames:
+
+- solicited-node `33:33:ff:xx:xx:xx`;
+- all-nodes `33:33:00:00:00:01`.
+
+`HAL_ETH_Init()` never writes `MACPFR`, so the MAC stays in perfect-filter mode and drops them.
+Without this step, IPv6 fails silently: a link-local address is assigned, but no neighbour
+resolution or router advertisements are ever received.
+
+Choose one of the following:
+
+- **Simple:** after `HAL_ETH_Init()`, call
+  `HAL_ETH_GetMACFilterConfig()`, set `.PassAllMulticast = ENABLE`, then call
+  `HAL_ETH_SetMACFilterConfig()`. This costs a little RX load and RX-pool pressure from unrelated
+  multicast traffic.
+- **Precise:** implement `ethernetif_mld_mac_filter()` to maintain the 64-bit multicast hash
+  (`HashMulticast = ENABLE`, `HAL_ETH_SetHashTable()`). lwIP calls it for each MLD group it joins
+  or leaves. The hash index is the upper 6 bits of the bit-reversed CRC32 of the destination MAC.
+
+### 5. `src/lwip_app.c`
+
+After `netif_add()` and `netif_set_default()`:
+
+```c
+#if LWIP_IPV6
+  netif_create_ip6_linklocal_address(&lwip_netif, 1);   /* fe80::/64 from the MAC (EUI-64) */
+  netif_set_ip6_autoconfig_enabled(&lwip_netif, 1);
+#endif
+```
+
+The link-local address is derived from the MAC. That makes fixing the hardcoded
+`02:00:00:00:00:00` MAC (see "Remaining work") a prerequisite: otherwise every board gets the same
+`fe80::` address, and duplicate address detection marks it invalid on all but the first.
+
+### 6. Dual-stack source fixes
+
+With `LWIP_IPV6 1`, `ip_addr_t` becomes a tagged union, no longer an alias of `ip4_addr_t`. Calls
+that pass an `ip_addr_t *` where lwIP expects an `ip4_addr_t *` compile with a warning, because
+the vendor env drops `-Werror`. They happen to work only because the IPv4 member comes first. Fix
+them explicitly:
+
+- `lwip_app.c`: declare `ipaddr`, `netmask` and `gateway` as `ip4_addr_t`, and use
+  `ip4_addr_set_zero()`. `IP4_ADDR()` already takes `ip4_addr_t *`.
+- `app_ethernet.c`, in `DHCP_Process()`:
+  - pass `ip_2_ip4(&ipaddr)` and so on to `netif_set_addr()`, or declare them as `ip4_addr_t`
+    with `IP4_ADDR()`;
+  - apply the same treatment to the three `ip_addr_set_zero_ip4(&netif->...)` calls.
+- `tcp_echoserver.c`, and any future DoIP listener: bind with `IP_ANY_TYPE` instead of
+  `IP_ADDR_ANY` to accept both IPv4 and IPv6. `IP_ADDR_ANY` is IPv4-only in dual-stack builds.
+- Rebuild and check that the lwip objects produce no new `incompatible pointer type` warnings.
+
+### 7. Budget and verify
+
+- **Flash:** roughly 20–30 KB extra; there is plenty of room.
+- **DTCM:** this is the constraint. The ND6 neighbour and destination caches, the ND6 queue,
+  MLD6 groups, IPv6 reassembly and the larger `struct netif` all land in `.bss`, and only about
+  14 KB is spare, which is the stack. Set `PBUF_POOL_SIZE` to 2–4 first (it returns about
+  20 KB), then compare `--print-memory-usage` before and after.
+- **SRAM12 and AXISRAM:** unchanged. IPv6 adds no DMA buffers.
+- **Verify on hardware:**
+  1. `ping6 fe80::<eui64>%<iface>` from a host on the same link.
+  2. With a router advertising a prefix, check that a global address appears.
+  3. Check that IPv4 DHCP still works (dual stack).
+  4. Confirm no `FAULT_REGISTER_DIVERGENT`. `MACPFR` is not in panda's register map, so changing
+     the filter is safe.
 
 ---
 
-## Phase 5 — Changes outside `lwip/` (the complete list)
+## Remaining work and concerns
 
-1. `panda/SConscript` — the hook above.
-2. **[NEW]** `board/drivers/can_common.h:20` — `CAN_RX_BUFFER_SIZE` `4096U` → `3840U`, one line.
-   Without this the link fails with `region AXISRAM overflowed`. See the RAM budget.
-3. `board/main.c` — guarded, ~8 lines total:
-   - top: `#ifdef ENABLE_ETHERNET` → `#include "board/lwip/inc/lwip_app.h"`
-   - **[CORRECTED]** call `lwip_stack_init();` **after `enable_interrupts()`**, not after
-     `spi_init()`. `eth_init` blocks ~200 ms in the PHY reset, and `wd_state.last_ts` is stamped
-     back at `simple_watchdog_init()` (`main.c:341`, 375 ms threshold) — placing it before
-     `enable_interrupts()` means the first `simple_watchdog_kick()` sees ~200 ms of PHY reset plus
-     up to 125 ms of tick latency. Under threshold, but with no margin. Alternatively trim the two
-     `HAL_Delay(100)` calls in `HAL_ETH_MspInit` to ~30 ms.
-   - `lwip_poll();` at the top of the `while (true)` loop **and once inside each LED-fade `for`
-     loop** (otherwise polling gaps reach hundreds of ms and TCP crawls). Power-save `__WFI()`
-     wakes at the 8 Hz tick, so polling continues there without changes.
-4. Nothing else — no linker script, no libc.h, no driver changes.
-5. **[CORRECTED]** ~~CI hygiene: add `board/lwip/` to MISRA suppressions~~ — **not needed**.
-   `tests/misra/test_misra.sh` only scans `board/main.c`, and cppcheck already passes
-   `--suppress=*:*inc/*`, which `board/lwip/inc/lwip_app.h` matches.
+### Required before merging
 
-### [NEW] Rejected: calling `lwip_poll()` from `isotp_tick_handler` (TIM23, 1 kHz ISR)
+1. **Commit the build hook.** `HEAD` does not compile lwIP: the `SConscript` hook and
+   `-DHAS_DOIP` exist only in the working tree. Also:
+   - delete the stray `sconscript.lwip.diff`, which is an older variant with `lwip=False`;
+   - drop the dead `# flags.append("-DHAS_DOIP")` line;
+   - pass `lwip=True` by keyword;
+   - restore the jungle and body builds that the working-tree change comments out. Both still
+     build.
+2. **MAC address.** It is hardcoded as `02:00:00:00:00:00` in `stm32h7xx_hal_conf.h`, so every
+   board has the same MAC, and two boards on one network will collide in ARP and DHCP. Derive a
+   locally administered MAC from the MCU UID (`UID_BASE`) or from provisioning data.
+3. **`rand()` is never seeded.** `srand()` is never called, so every boot produces the same
+   sequence of DHCP transaction IDs, TCP initial sequence numbers and ephemeral ports. Every board
+   produces the same sequence too. Seed it in `lwip_stack_init()` from the UID mixed with
+   `microsecond_timer_get()`, or use the H7 RNG peripheral.
+4. **Replace the demo echo server** (TCP port 7, reachable by anyone on the network) with the
+   DoIP service, or stop starting it.
 
-Considered and rejected. The motivation is sound — `MAX_LED_FADE` is 10240 and the main loop runs
-two fade loops per pass, each iteration calling a pair of `delay()` busy-waits, so a bare
-`lwip_poll()` at the top of `while (true)` executes only once per several hundred milliseconds,
-and with `ETH_RX_DESC_CNT = 4` plus a 6-buffer RX pool the ring overruns under any real traffic.
-A timer-driven poll is the right *shape* of answer; ISR **context** is what makes it wrong.
+### Robustness concerns
 
-Reasons, worst first:
+5. **Errors are ignored:**
+   - `HAL_ETH_Init()`'s return value is ignored in `low_level_init()`. A DMA-reset timeout
+     (no PHY REF_CLK) goes unnoticed.
+   - `lwip_stack_init()`'s return value is ignored in `main.c`.
+   - `low_level_output()` ignores `HAL_ETH_Transmit()`'s result and always returns `ERR_OK`.
 
-1. **The lwIP raw API is not reentrant.** `NO_SYS = 1` with `SYS_LIGHTWEIGHT_PROT = 0`
-   (`lwipopts.h:42,48`) means zero internal locking, and lwIP requires all raw-API calls come from
-   one context. It would be safe only while `lwip_poll()` is the sole caller — which forecloses
-   calling `tcp_write`/`udp_send` for DoIP from main-loop or comms-handler context. The failure
-   mode is silent pbuf/memp corruption, not a clean error.
-2. **Priority-0 ISR blocking safety-relevant work.** Panda only deprioritizes SPI (`llspi.h` sets
-   DMA2_Stream2/3 and SPI4); TIM23, TIM12, FDCAN1/2/3 and OTG_HS all sit at the default priority 0,
-   and equal priorities cannot preempt each other. A long `lwip_poll()` therefore stalls FDCAN RX
-   (frame loss on FIFO overrun), USB, and the TIM12 8 Hz tick — which is what calls
-   `simple_watchdog_kick()`. Stall it past 375 ms and you trip `FAULT_HEARTBEAT_LOOP_WATCHDOG`.
-3. **`lwip_poll()` is unbounded work, not a 1 ms job.** `ethernetif_input()` drains the whole RX
-   ring in a `do/while` with the full IP/TCP path and app callbacks per packet;
-   `sys_check_timeouts()` can fire the TCP slow timer and walk every PCB doing retransmits; and
-   every 100 ms `Ethernet_Link_Periodic_Handle()` does MDIO reads via `HAL_ETH_ReadPHYRegister`,
-   busy-polling `MACMDIOAR` at ~2.5 MHz, with an error path that can call `HAL_ETH_Stop`/`Start`.
-4. **Overruns fail silently.** `isotp_tick_handler` clears `ISOTP_TIMER->SR = 0U` unconditionally
-   at the end (`main.c:287`), so a tick arriving mid-ISR is swallowed and ISO-TP timing (STmin,
-   N_Ar/N_Bs — all ms-scale) degrades with no error. The rate-limit fault does **not** catch this:
-   `REGISTER_INTERRUPT(ISOTP_TIMER_IRQ, ..., 1500U, ...)` has 50% headroom over 1 kHz and overruns
-   produce *missed* ticks, not extra ones.
-5. **Two concrete correctness bugs.** `HAL_GetTick()` (Phase 2) keeps non-atomic static state and
-   is documented "called only from the main-loop polling context" — from an ISR the accumulator
-   races and HAL/lwIP timers lose time. And `print()` on lwIP's assert and link paths runs
-   `injectc()` inside `ENTER_CRITICAL`/`EXIT_CRITICAL`, which mutates a global depth counter and
-   calls `__enable_irq()` on exit; workable in ISR context but fragile.
-6. **Breaks a diagnostic.** `handle_interrupt()` accumulates `busy_time` for every ISR and
-   publishes `interrupt_load` in the health packet (`main_comms.h`); moving the network stack into
-   an ISR makes the board report near-total interrupt load.
+   At minimum, print on failure. Consider a panda fault code for "Ethernet init failed".
+6. **Asserts don't stop execution.** `LWIP_PLATFORM_ASSERT` prints and carries on with corrupted
+   state. Either route it to `fault_occurred()` and hang, or define `LWIP_NOASSERT` for release
+   builds. With 477 assert sites, `LWIP_NOASSERT` also saves flash.
+7. **RAM headroom is thin:**
+   - SRAM12 has 2.8 KB free, so one more RX buffer does not fit.
+   - AXISRAM has 11.3 KB free.
+   - DTCM has about 14 KB left for the stack.
 
-**Decision: keep the current design** — `lwip_poll()` in the `while (true)` loop and once inside
-each LED-fade `for` loop (item 3 above). If cadence proves insufficient during bring-up, the
-ordered fallbacks are: (a) flag-in-ISR, work-in-thread — the tick handler sets a
-`volatile bool lwip_poll_pending` and the main loop services it, keeping all lwIP calls in thread
-mode; (b) shorten or compile out the LED fade for the Ethernet build, since the fade *is* the gap;
-(c) go interrupt-driven on RX via `REGISTER_INTERRUPT(ETH_IRQn, ...)` with the ISR only clearing
-DMA status and setting a flag. Option (c) is the idiomatic long-term answer; "no NVIC work needed"
-in the Verified Facts is a bring-up simplification, not a constraint.
+   Cheap wins:
+   - set `PBUF_POOL_SIZE` to 2–4, which returns about 18–21 KB of DTCM (stack headroom);
+   - SRAM4 is now entirely free for CPU-only data.
+8. **CAN RX ring is 6% smaller.** If that matters for the target traffic, it can be restored to
+   4096 without touching Ethernet memory. Move one ISO-TP queue (12,294 B, CPU-only) from AXISRAM
+   to the now-empty SRAM4. AXISRAM free space then rises to about 23.8 KB, more than the 18,432 B
+   needed.
+9. **SysTick coupling.** Nothing prevents a future caller from using a HAL timeout before
+   `enable_interrupts()` or inside a critical section, which would hang. Keep all ETH/HAL calls in
+   main-loop context after init.
+10. **Link-flap path.** `ethernet_link_check_state()` stops and restarts the MAC/DMA from the main
+    loop. This path is untested beyond cable replug; test it under traffic.
 
----
+### Cleanup (no functional change)
 
-## Phase 6 — Bring-up & verification order
+- `board/drivers/timers.h` still defines `milliseconds_count` and `millisecond_timer_get()`.
+  Nothing increments the counter any more, so the getter always returns 0. Delete both.
+- `lwip_app.h` declares `lwip_dma_memory_init()`, which has no definition. Remove it.
+- `lwip_app.h` leaks `CORE_CLOCK_HZ` and the `IP_ADDR*` / `NETMASK_ADDR*` / `GW_ADDR*` macros into
+  panda's TU. Derive the SysTick reload from `CORE_FREQ` instead of a second hardcoded 240 MHz,
+  and move the address macros into a lwip-private header.
+- `lwip_port.h`: the `PANDA_MODE_*` / `PANDA_PULL_*` constants are unused.
+- `ethernetif.c` uses `MODE_OUTPUT`, which resolves to the HAL's macro. It happens to equal
+  panda's value (1). Use `PANDA_MODE_OUTPUT` instead.
+- `lwip_port.c`: the comment on `HAL_GetTick()` ("TIM2 free-runs, works before
+  enable_interrupts") is stale.
+- `ethernetif.c`:
+  - move the RX-pool section declaration above `LWIP_MEMPOOL_DECLARE`, or declare the pool storage
+    explicitly;
+  - delete the IAR/MDK `#if` branches;
+  - remove the unused `GPIO_InitStructure`.
+- `lwip_clock_init()` sets MCO1 bits with `register_set_bits()`. That relies on the reset value
+  of `CFGR`. `register_set(&RCC->CFGR, value, MCO1 | MCO1PRE mask)` is more robust.
+- `board/lwip/SConscript` still lists the removed `app/` directory in `CPPPATH`.
+- Unbuilt files still on disk:
+  - `middlewares/libc/{memcpy,memset}.c`, `aeabi_*`, `*.S`;
+  - `middlewares/lwip/src/api/` (keep only if an RTOS move is planned);
+  - `src/apps/http/`;
+  - `system/OS/sys_arch.c`;
+  - HAL headers `_cortex`, `_dma*`, `_exti`, `_pwr*` (with their modules still enabled in
+    `stm32h7xx_hal_conf.h`).
+- A stale `board/obj/panda_h7stm32h7xx_hal.o` from before the HAL deletion remains in the build
+  directory. It is harmless because it is not linked.
 
-1. `scons` → iterate compile errors (mostly HAL header closure; re-keep any header it demands).
-   Consider dropping `-fmax-errors=1` from the lwip env while iterating.
-2. Link → resolve undefineds by adding the specific `middlewares/libc` file or port-file symbol;
-   **if `__aeabi_uldivmod`/similar appears** (64-bit division somewhere in lwip), append `-lgcc` to
-   the program's LINKFLAGS rather than importing more newlib files.
-3. **[CORRECTED]** Inspect `main.elf` map against the RAM budget above:
-   - `.axisram` ≤ 320K: CAN ring 276,480 + ISO-TP 24,588 + heap 14,848 = 315,916, ~11.5K spare
-   - `.sram12` ≤ 32K: SPI 8,192 + ISO-TP staging 12,296 + descriptors ~224 + RX pool 9,408 = 30,120, ~2.6K spare
-   - DTCM `.bss` should *shrink* relative to a naive integration thanks to `PBUF_POOL_SIZE 0`
-   If SRAM12 still overflows, move the RX pool to `.axisram.eth_rx` (there is room) rather than
-   dropping `ETH_RX_BUFFER_CNT` below 6.
-4. Sanity-audit symbols: `arm-none-eabi-nm board/obj/panda_h7/*.o | grep ' U '` on lwip objects —
-   `memcpy`/`memset`/`print`/`microsecond_timer_get`/`set_gpio_*` should be `U` (resolved from the
-   main TU), and `nm main.elf` should show exactly one `main`, one `usb_init`, one `memcpy`.
-5. Flash; confirm `lwip_dma_memory_init()` returns **true** (it validates every DMA buffer's region
-   at runtime — a `false` means a section attribute didn't take). Watch the panda debug console for
-   the DHCP/link prints; then link up → `ping <ip>` → `nc <ip> 7` (echo server binds port 7).
-6. **[NEW]** Confirm no `FAULT_REGISTER_DIVERGENT` after ~5 s of uptime — that is the signal that
-   the GPIO-helper conversion in `HAL_ETH_MspInit` was complete. `check_registers()` runs at 1 Hz.
-7. Regression: CAN (with the smaller RX ring), USB enum, SPI (its buffers are SRAM12 neighbours of
-   the new ETH data), heartbeat/safety ticks — confirm `lwip_stack_init` and per-loop `lwip_poll`
-   don't trip `FAULT_HEARTBEAT_LOOP_WATCHDOG` (fed at 8 Hz from the tick interrupt, so it shouldn't).
+### Open hardware and product questions
 
----
-
-## Open items needing schematic/hardware confirmation
-
-- **PHY clocking**: the wrapper reproduces the demo's MCO1 = HSE/1 = 25 MHz on PA8. Confirm rev3
-  actually feeds the LAN8742 XI from PA8 (vs. its own crystal) — if it has a crystal, delete the
-  MCO block.
-- **PE5 (RMII_PWR_EN) / PE0 (NRST) polarity**, and whether the commented-out `DOIP_EN` (PB4,
-  active-low in `boards/richie.h`) must also be asserted to power the ETH/DoIP circuit — if so, add
-  it to `lwip_stack_init` via panda's GPIO helpers (stays inside `lwip/`). Note PB4 **is** in use on
-  Richie as a CAN2 transceiver enable, so this needs care.
-- **MAC address** is hardcoded `02:00:00:00:00:00` in `stm32h7xx_hal_conf.h` — fine for bringup;
-  later derive it from the panda serial/provisioning.
-- DHCP is enabled with a 192.168.0.10 static fallback — decide the addressing scheme for the
+- **PHY clock:** MCO1 (25 MHz on PA8) is driven and Ethernet works. Confirm on the rev3 schematic
+  that the LAN8742 XI really is fed from PA8. If the PHY has its own crystal, remove the MCO block.
+- **`DOIP_EN` (PB4):** Ethernet works without asserting it. Confirm whether it gates anything else
+  in the DoIP circuit. PB4 is also used as a CAN2 transceiver enable on Richie.
+- **Addressing:** decide whether the DHCP-with-static-fallback scheme (`192.168.0.10`) fits the
   nRF9151/DoIP use case.
-- **[NEW]** Is the CAN RX ring reduction (4096 → 3840 frames, ~6%) acceptable for the intended
-  traffic? If not, the alternative reclaim is guarding `stm32h7/sound.h`'s SRAM4 buffers behind a
-  board capability (14.2K, genuinely dead on Richie) and moving the heap there instead.
-
-## Top risks
-
-1. **H735 device-header compatibility**: panda's CMSIS snapshot vs. what this HAL revision expects —
-   a compile error there is the signal; fallback is resurrecting `lwip/drivers/cmsis/inc` for
-   lwip-internal use only.
-2. **[CORRECTED] RAM budget**: no longer a single knob. AXISRAM needs the CAN ring reduction and
-   SRAM12 needs `ETH_RX_BUFFER_CNT = 6`; both are hard link errors if missed, with the RX pool's
-   AXISRAM relocation as the remaining slack.
-3. **[NEW] Register-map divergence**: if any ETH pin is still configured with `HAL_GPIO_Init`, the
-   board faults at 1 Hz with `FAULT_REGISTER_DIVERGENT`. Symptom is a healthy link that faults a
-   second after `lwip_stack_init()`.
-
-Everything else is mechanical.
