@@ -379,8 +379,6 @@ u32_t sys_now(void)
   */
 void HAL_ETH_MspInit(ETH_HandleTypeDef *heth)
 {
-  GPIO_InitTypeDef GPIO_InitStructure = {0};
-
   /* Ethernet MSP init: RMII Mode */
   /* Ethernet pins configuration */
   /*

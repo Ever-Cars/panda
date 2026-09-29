@@ -489,11 +489,6 @@ them explicitly:
 
 1. **Commit the build hook.** `HEAD` does not compile lwIP: the `SConscript` hook and
    `-DHAS_DOIP` exist only in the working tree. Also:
-   - delete the stray `sconscript.lwip.diff`, which is an older variant with `lwip=False`;
-   - drop the dead `# flags.append("-DHAS_DOIP")` line;
-   - pass `lwip=True` by keyword;
-   - restore the jungle and body builds that the working-tree change comments out. Both still
-     build.
 2. **MAC address.** It is hardcoded as `02:00:00:00:00:00` in `stm32h7xx_hal_conf.h`, so every
    board has the same MAC, and two boards on one network will collide in ARP and DHCP. Derive a
    locally administered MAC from the MCU UID (`UID_BASE`) or from provisioning data.
@@ -536,39 +531,12 @@ them explicitly:
 
 ### Cleanup (no functional change)
 
-- `board/drivers/timers.h` still defines `milliseconds_count` and `millisecond_timer_get()`.
-  Nothing increments the counter any more, so the getter always returns 0. Delete both.
-- `lwip_app.h` declares `lwip_dma_memory_init()`, which has no definition. Remove it.
-- `lwip_app.h` leaks `CORE_CLOCK_HZ` and the `IP_ADDR*` / `NETMASK_ADDR*` / `GW_ADDR*` macros into
-  panda's TU. Derive the SysTick reload from `CORE_FREQ` instead of a second hardcoded 240 MHz,
-  and move the address macros into a lwip-private header.
 - `lwip_port.h`: the `PANDA_MODE_*` / `PANDA_PULL_*` constants are unused.
 - `ethernetif.c` uses `MODE_OUTPUT`, which resolves to the HAL's macro. It happens to equal
   panda's value (1). Use `PANDA_MODE_OUTPUT` instead.
-- `lwip_port.c`: the comment on `HAL_GetTick()` ("TIM2 free-runs, works before
-  enable_interrupts") is stale.
-- `ethernetif.c`:
-  - move the RX-pool section declaration above `LWIP_MEMPOOL_DECLARE`, or declare the pool storage
-    explicitly;
-  - delete the IAR/MDK `#if` branches;
-  - remove the unused `GPIO_InitStructure`.
-- `lwip_clock_init()` sets MCO1 bits with `register_set_bits()`. That relies on the reset value
-  of `CFGR`. `register_set(&RCC->CFGR, value, MCO1 | MCO1PRE mask)` is more robust.
-- `board/lwip/SConscript` still lists the removed `app/` directory in `CPPPATH`.
-- Unbuilt files still on disk:
-  - `middlewares/libc/{memcpy,memset}.c`, `aeabi_*`, `*.S`;
-  - `middlewares/lwip/src/api/` (keep only if an RTOS move is planned);
-  - `src/apps/http/`;
-  - `system/OS/sys_arch.c`;
-  - HAL headers `_cortex`, `_dma*`, `_exti`, `_pwr*` (with their modules still enabled in
-    `stm32h7xx_hal_conf.h`).
-- A stale `board/obj/panda_h7stm32h7xx_hal.o` from before the HAL deletion remains in the build
-  directory. It is harmless because it is not linked.
 
 ### Open hardware and product questions
 
-- **PHY clock:** MCO1 (25 MHz on PA8) is driven and Ethernet works. Confirm on the rev3 schematic
-  that the LAN8742 XI really is fed from PA8. If the PHY has its own crystal, remove the MCO block.
 - **`DOIP_EN` (PB4):** Ethernet works without asserting it. Confirm whether it gates anything else
   in the DoIP circuit. PB4 is also used as a CAN2 transceiver enable on Richie.
 - **Addressing:** decide whether the DHCP-with-static-fallback scheme (`192.168.0.10`) fits the

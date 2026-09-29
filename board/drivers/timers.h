@@ -1,5 +1,3 @@
-static volatile uint32_t milliseconds_count = 0U;
-
 static void timer_init(TIM_TypeDef *TIM, int psc) {
   register_set(&(TIM->PSC), (psc-1), 0xFFFFU);
   register_set(&(TIM->DIER), TIM_DIER_UIE, 0x5F5FU);
@@ -25,11 +23,6 @@ void microsecond_timer_init(void) {
 
 uint32_t microsecond_timer_get(void) {
   return MICROSECOND_TIMER->CNT;
-}
-
-uint32_t millisecond_timer_get(void)
-{
-  return milliseconds_count;
 }
 
 void interrupt_timer_init(void) {

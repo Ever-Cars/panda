@@ -6,7 +6,6 @@ lenv['CFLAGS'] = [f for f in lenv['CFLAGS'] if f not in ('-Werror', '-Wextra', '
 lenv.Append(CFLAGS=['-Wno-unused-parameter', '-DUSE_HAL_DRIVER'])
 lenv.Prepend(CPPPATH=[
   Dir('inc'),
-  Dir('app'),
   Dir('drivers/hal/inc'),        # must precede board/stm32h7/inc (hal_def.h / hal_gpio_ex.h basename overlap)
   Dir('drivers/lan8742'),
   Dir('middlewares/lwip/src/include'),

@@ -11,8 +11,6 @@ void SysTick_Handler(void) {
   systick++;
 }
 
-// wrap-safe ms tick; called only from the main-loop polling context.
-// Works before enable_interrupts(): TIM2 free-runs, it is not interrupt-driven.
 uint32_t HAL_GetTick(void) {
   return systick;
 }

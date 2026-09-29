@@ -52,7 +52,7 @@ void lwip_clock_init(void) {
   set_gpio_pullup(GPIOA, 8, GPIO_NOPULL);
   set_gpio_alternate(GPIOA, 8, GPIO_AF0_MCO);
   register_set_bits(&(GPIOA->OSPEEDR), GPIO_OSPEEDR_OSPEED8);
-  register_set_bits(&(RCC->CFGR), RCC_CFGR_MCO1_1 | RCC_CFGR_MCO1PRE_0);
+  register_set(&(RCC->CFGR), RCC_CFGR_MCO1_1 | RCC_CFGR_MCO1PRE_0, RCC_CFGR_MCO1_Msk);
 }
 
 bool lwip_stack_init(void) {

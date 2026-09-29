@@ -4,13 +4,6 @@
 #include <stdint.h>
 #include "stm32h7xx.h"
 
-// drivers/gpio.h — used instead of HAL_GPIO_Init so panda's register_map stays in sync.
-// Constants mirror board/drivers/gpio.h; keep in step if that file ever changes.
-#define PANDA_MODE_OUTPUT 1U
-#define PANDA_MODE_ALTERNATE 2U
-#define PANDA_PULL_NONE 0U
-#define PANDA_OUTPUT_TYPE_PUSH_PULL 0U
-
 extern void print(const char *a);
 
 extern void set_gpio_mode(GPIO_TypeDef *GPIO, unsigned int pin, unsigned int mode);

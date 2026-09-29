@@ -26,9 +26,6 @@
 // Configure clocks used only by Ethernet. Panda remains the system-clock owner.
 void lwip_clock_init(void);
 
-// Initialize and verify the linker-placed Ethernet DMA memory.
-bool lwip_dma_memory_init(void);
-
 // Initialize lwIP, the RMII network interface, and the demo TCP service.
 bool lwip_stack_init(void);
 
