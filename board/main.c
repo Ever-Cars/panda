@@ -10,7 +10,7 @@
 #include "board/early_init.h"
 #include "board/provision.h"
 
-#include "opendbc/safety/safety.h"
+#include "board/safety/safety.h"
 
 #include "board/health.h"
 
@@ -69,6 +69,7 @@ void set_safety_mode(uint16_t mode, uint16_t param) {
       can_silent = false;
       break;
     case SAFETY_ELM327:
+    case SAFETY_RICHIE:
       set_intercept_relay(false, false);
       heartbeat_counter = 0U;
       heartbeat_lost = false;
@@ -102,7 +103,8 @@ bool is_car_safety_mode(uint16_t mode) {
   return (mode != SAFETY_SILENT) &&
          (mode != SAFETY_NOOUTPUT) &&
          (mode != SAFETY_ALLOUTPUT) &&
-         (mode != SAFETY_ELM327);
+         (mode != SAFETY_ELM327) &&
+         (mode != SAFETY_RICHIE);
 }
 
 // ***************************** main code *****************************
