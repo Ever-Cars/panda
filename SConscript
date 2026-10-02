@@ -68,7 +68,7 @@ def to_c_uint32(x):
   return "{" + 'U,'.join(map(str, nums)) + "U}"
 
 
-def build_project(project_name, project, main, extra_flags, lwip=False):
+def build_project(project_name, project, main, extra_flags):
   project_dir = Dir(f'./board/obj/{project_name}/')
 
   flags = project["FLAGS"] + extra_flags + common_flags + [
@@ -122,7 +122,7 @@ def build_project(project_name, project, main, extra_flags, lwip=False):
 
   # Add lwip objects if needed
   lwip_objs = []
-  if lwip:
+  if '-DHAS_DOIP' in extra_flags:
     lwip_objs = SConscript('board/lwip/SConscript', exports={'env': env})
 
   # Build + sign main (aka app)
@@ -191,7 +191,7 @@ common_flags += [f"-DHEALTH_PACKET_VERSION=0x{hh:08X}U", f"-DCAN_PACKET_VERSION_
                  f"-DJUNGLE_HEALTH_PACKET_VERSION=0x{jh:08X}U"]
 
 # panda fw (default: richie_rev3)
-build_project("panda_h7", base_project_h7, "./board/main.c", ['-DRICHIE', '-DRICHIE_REV3', '-DHAS_DOIP'], lwip=True)
+build_project("panda_h7", base_project_h7, "./board/main.c", ['-DRICHIE', '-DRICHIE_REV3', '-DHAS_DOIP'])
 
 # panda fw rev2 (legacy, uncomment if needed)
 # build_project("panda_h7_rev2", base_project_h7, "./board/main.c", ['-DRICHIE', '-DRICHIE_REV2'])
