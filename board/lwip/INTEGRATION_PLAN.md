@@ -37,10 +37,10 @@ Everything that duplicated panda was deleted. Changes outside `lwip/` are limite
 
 | Path | Role |
 |---|---|
-| `inc/lwip_app.h` | Public API included by `board/main.c`: `lwip_stack_init()`, `lwip_poll()`, `lwip_clock_init()`, static-IP / netmask / gateway macros, `CORE_CLOCK_HZ`. Kept free of HAL and lwIP includes so panda's strict TU can include it. |
-| `inc/lwip_port.h` | `extern` prototypes for the panda symbols the lwip tree calls (`print`, `set_gpio_*`, `register_set`, `register_set_bits`), so no lwip file includes panda headers. |
+| `inc/lwip_app.h` | Public API included by `board/main.c`: `lwip_stack_init()`, `lwip_poll()`, `lwip_clock_init()`, `CORE_CLOCK_HZ`. Kept free of HAL and lwIP includes so panda's strict TU can include it. |
+| `inc/lwip_port.h` | `extern` prototypes for the panda symbols the lwip tree calls (`print`, `set_gpio_*`, `register_set`, `register_set_bits`, `microsecond_timer_get`), so no lwip file includes panda headers. Also declares `lwip_uid_hash()`. |
 | `inc/lwipopts.h` | lwIP configuration. |
-| `inc/stm32h7xx_hal_conf.h` | HAL config: `HSE_VALUE` 25 MHz, 4 RX + 4 TX descriptors, MAC address. |
+| `inc/stm32h7xx_hal_conf.h` | HAL config: `HSE_VALUE` 25 MHz, 4 RX + 4 TX descriptors. The MAC is derived from the device UID in `ethernetif.c`. |
 | `src/lwip_app.c` | Stack bring-up and poll loop; ETH clock/MCO setup; SysTick setup; owns `lwip_ram_heap`. |
 | `src/lwip_port.c` | Replaces the deleted HAL/CMSIS scaffolding: `SysTick_Handler`, `HAL_GetTick`, `HAL_Delay`, `HAL_InitTick` stub, and `SystemCoreClock` / `SystemD2Clock` / `D1CorePrescTable` / `uwTickPrio`. |
 | `src/ethernetif.c` | lwIP netif driver: descriptors, RX pool, `HAL_ETH_MspInit` (pins, PHY power/reset), PHY I/O glue, link-state handling. |
