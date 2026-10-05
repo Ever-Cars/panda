@@ -138,6 +138,33 @@ void pbuf_free_custom(struct pbuf *p);
                        LL Driver Interface ( LwIP stack --> ETH)
 *******************************************************************************/
 /**
+  * @brief Derive a per-device MAC address from the 96-bit unique device ID.
+  *        The UID is hashed (FNV-1a 64) so devices from the same wafer, whose
+  *        UIDs differ in only a few bits, still get well spread addresses.
+  *        AutoIP seeds its first link-local candidate from hwaddr[4..5].
+  * @param mac buffer of ETH_HWADDR_LEN bytes
+  */
+static void ethernetif_get_mac_address(uint8_t *mac)
+{
+  const uint8_t *uid = (const uint8_t *)UID_BASE;
+  uint64_t hash = 0xcbf29ce484222325ULL;
+
+  for (uint32_t i = 0U; i < 12U; i++)
+  {
+    hash ^= uid[i];
+    hash *= 0x100000001b3ULL;
+  }
+
+  /* Locally administered, unicast */
+  mac[0] = 0x02U;
+  for (uint32_t i = 1U; i < ETH_HWADDR_LEN; i++)
+  {
+    mac[i] = (uint8_t)hash;
+    hash >>= 8;
+  }
+}
+
+/**
   * @brief In this function, the hardware should be initialized.
   * Called from ethernetif_init().
   *
@@ -146,7 +173,8 @@ void pbuf_free_custom(struct pbuf *p);
   */
 static void low_level_init(struct netif *netif)
 {
-  uint8_t macaddress[6]= {ETH_MAC_ADDR0, ETH_MAC_ADDR1, ETH_MAC_ADDR2, ETH_MAC_ADDR3, ETH_MAC_ADDR4, ETH_MAC_ADDR5};
+  static uint8_t macaddress[ETH_HWADDR_LEN];
+  ethernetif_get_mac_address(macaddress);
 
   EthHandle.Instance = ETH;
   EthHandle.Init.MACAddr = macaddress;
@@ -162,12 +190,7 @@ static void low_level_init(struct netif *netif)
   netif->hwaddr_len = ETH_HWADDR_LEN;
 
   /* set MAC hardware address */
-  netif->hwaddr[0] =  ETH_MAC_ADDR0;
-  netif->hwaddr[1] =  ETH_MAC_ADDR1;
-  netif->hwaddr[2] =  ETH_MAC_ADDR2;
-  netif->hwaddr[3] =  ETH_MAC_ADDR3;
-  netif->hwaddr[4] =  ETH_MAC_ADDR4;
-  netif->hwaddr[5] =  ETH_MAC_ADDR5;
+  memcpy(netif->hwaddr, macaddress, ETH_HWADDR_LEN);
 
   /* maximum transfer unit */
   netif->mtu = ETH_MAX_PAYLOAD;

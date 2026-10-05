@@ -22,6 +22,9 @@
 #if LWIP_DHCP
 #include "lwip/dhcp.h"
 #endif
+#if LWIP_AUTOIP
+#include "lwip/autoip.h"
+#endif
 #include "app_ethernet.h"
 #include "ethernetif.h"
 #include "lwip_port.h"
@@ -34,7 +37,6 @@
 uint32_t EthernetLinkTimer;
 
 #if LWIP_DHCP
-#define MAX_DHCP_TRIES  10
 uint32_t DHCPfineTimer = 0;
 uint8_t DHCP_state = DHCP_OFF;
 #endif
@@ -120,28 +122,28 @@ void DHCP_Process(struct netif *netif)
         char *iptxt = ip4addr_ntoa(netif_ip4_addr(netif));
         print("IP address assigned by a DHCP server: "); print(iptxt); print("\n");
       }
-      else
+#if LWIP_AUTOIP
+      else if (autoip_supplied_address(netif))
       {
-        dhcp = (struct dhcp *)netif_get_client_data(netif, LWIP_NETIF_CLIENT_DATA_INDEX_DHCP);
-
-        /* DHCP timeout */
-        if (dhcp->tries > MAX_DHCP_TRIES)
-        {
-          DHCP_state = DHCP_TIMEOUT;
-
-          /* Static address used */
-          IP_ADDR4(&ipaddr, IP_ADDR0 ,IP_ADDR1 , IP_ADDR2 , IP_ADDR3 );
-          IP_ADDR4(&netmask, NETMASK_ADDR0, NETMASK_ADDR1, NETMASK_ADDR2, NETMASK_ADDR3);
-          IP_ADDR4(&gw, GW_ADDR0, GW_ADDR1, GW_ADDR2, GW_ADDR3);
-          netif_set_addr(netif, &ipaddr, &netmask, &gw);
-
-          char *iptxt = ip4addr_ntoa(netif_ip4_addr(netif));
-          print("DHCP Timeout !! \n");
-          print("Static IP address: "); print(iptxt); print("\n");
-        }
+        DHCP_state = DHCP_AUTOIP_ASSIGNED;
+        char *iptxt = ip4addr_ntoa(netif_ip4_addr(netif));
+        print("Auto IP address assigned: "); print(iptxt); print("\n");
+      }
+#endif /* LWIP_AUTOIP */
+    }
+    break;
+#if LWIP_AUTOIP
+  case DHCP_AUTOIP_ASSIGNED:
+    {
+      /* A late DHCP lease replaces the link-local address, and an AutoIP
+         conflict drops it; either way go back to waiting for an address */
+      if (dhcp_supplied_address(netif) || !autoip_supplied_address(netif))
+      {
+        DHCP_state = DHCP_WAIT_ADDRESS;
       }
     }
     break;
+#endif /* LWIP_AUTOIP */
   case DHCP_LINK_DOWN:
     {
       DHCP_state = DHCP_OFF;

@@ -13,3 +13,4 @@ extern void set_gpio_alternate(GPIO_TypeDef *GPIO, unsigned int pin, unsigned in
 extern void set_gpio_pullup(GPIO_TypeDef *GPIO, unsigned int pin, unsigned int mode);
 extern void register_set(volatile uint32_t *addr, uint32_t val, uint32_t mask);
 extern void register_set_bits(volatile uint32_t *addr, uint32_t val);
+extern uint32_t microsecond_timer_get(void);

@@ -110,6 +110,15 @@ extern unsigned char lwip_ram_heap[];
 #define LWIP_DHCP               1
 
 
+/* ---------- AUTOIP options ---------- */
+#define LWIP_AUTOIP             1
+/* Start AutoIP (169.254/16 link-local) after this many unanswered DHCP
+   discovers. DHCP keeps running and replaces the link-local address if a
+   server answers later. */
+#define LWIP_DHCP_AUTOIP_COOP        1
+#define LWIP_DHCP_AUTOIP_COOP_TRIES  3
+
+
 /* ---------- UDP options ---------- */
 #define LWIP_UDP                1
 #define UDP_TTL                 255

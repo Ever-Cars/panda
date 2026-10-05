@@ -6,6 +6,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "stm32h7xx_hal.h"
@@ -67,11 +68,11 @@ bool lwip_stack_init(void) {
   ip_addr_set_zero_ip4(&ipaddr);
   ip_addr_set_zero_ip4(&netmask);
   ip_addr_set_zero_ip4(&gateway);
-#else
-  IP4_ADDR(&ipaddr, IP_ADDR0, IP_ADDR1, IP_ADDR2, IP_ADDR3);
-  IP4_ADDR(&netmask, NETMASK_ADDR0, NETMASK_ADDR1, NETMASK_ADDR2, NETMASK_ADDR3);
-  IP4_ADDR(&gateway, GW_ADDR0, GW_ADDR1, GW_ADDR2, GW_ADDR3);
 #endif
+
+  // Must precede lwip_init(): tcp_init()/udp_init() draw the initial local ports from LWIP_RAND().
+  const uint32_t *uid = (const uint32_t *)UID_BASE;
+  srand(uid[0] ^ uid[1] ^ uid[2] ^ microsecond_timer_get());
 
   lwip_init();
 

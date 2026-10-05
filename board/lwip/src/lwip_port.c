@@ -1,4 +1,5 @@
 #include "stm32h7xx_hal.h"
+#include "lwip_port.h"
 
 // referenced by linked-but-unused hal_rcc.c code (no --gc-sections)
 uint32_t SystemCoreClock = 240000000U;
