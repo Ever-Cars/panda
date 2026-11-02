@@ -26,7 +26,7 @@
 #include "board/can_comms.h"
 #include "board/main_comms.h"
 #ifdef HAS_DOIP
-#include "board/lwip/inc/lwip_app.h"
+#include "board/net/inc/lwip_app.h"
 #endif
 
 #ifdef RICHIE
