@@ -57,17 +57,17 @@ void lwip_clock_init(void) {
 }
 
 bool lwip_stack_init(void) {
-  ip_addr_t ipaddr;
-  ip_addr_t netmask;
-  ip_addr_t gateway;
+  ip4_addr_t ipaddr;
+  ip4_addr_t netmask;
+  ip4_addr_t gateway;
 
   lwip_clock_init();
   lwip_systic_init();
 
 #if LWIP_DHCP
-  ip_addr_set_zero_ip4(&ipaddr);
-  ip_addr_set_zero_ip4(&netmask);
-  ip_addr_set_zero_ip4(&gateway);
+  ip4_addr_set_zero(&ipaddr);
+  ip4_addr_set_zero(&netmask);
+  ip4_addr_set_zero(&gateway);
 #endif
 
   // Must precede lwip_init(): tcp_init()/udp_init() draw the initial local ports from LWIP_RAND().
@@ -83,6 +83,10 @@ bool lwip_stack_init(void) {
 
   netif_set_default(&lwip_netif);
   ethernet_link_status_updated(&lwip_netif);
+#if LWIP_IPV6
+  ethernet_ipv6_init(&lwip_netif);
+#endif
+
 
 #if LWIP_NETIF_LINK_CALLBACK
   netif_set_link_callback(&lwip_netif, ethernet_link_status_updated);

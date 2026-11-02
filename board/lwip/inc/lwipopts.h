@@ -87,6 +87,28 @@ extern unsigned char lwip_ram_heap[];
 */
 #define LWIP_NETIF_LINK_CALLBACK        1
 
+/* LWIP_NETIF_EXT_STATUS_CALLBACK==1: report IPv4/IPv6 address changes */
+#define LWIP_NETIF_EXT_STATUS_CALLBACK  1
+
+/* ---------- IP options ---------- */
+#define LWIP_IPV4                       1
+#define LWIP_IPV6                       1
+
+/* ---------- IPv6 options ---------- */
+/* Stateless address autoconfiguration (SLAAC) from Router Advertisements */
+#define LWIP_IPV6_AUTOCONFIG            1
+#define LWIP_IPV6_MLD                   1
+#define LWIP_ICMP6                      1
+#define LWIP_IPV6_FRAG                  1
+#define LWIP_IPV6_REASS                 1
+/* One link-local address plus two SLAAC addresses */
+#define LWIP_IPV6_NUM_ADDRESSES         3
+/* lwIP 2.1.2 only implements stateless DHCPv6, SLAAC is enough here */
+#define LWIP_IPV6_DHCP6                 0
+/* Answer pings to multicast groups (e.g. ff02::1) */
+#define LWIP_MULTICAST_PING             1
+
+
 /* ---------- TCP options ---------- */
 #define LWIP_TCP                1
 #define TCP_TTL                 255
@@ -159,6 +181,11 @@ The STM32H7xx allows computing and verifying the IP, UDP, TCP and ICMP checksums
   #define CHECKSUM_GEN_ICMP               1
   /* CHECKSUM_CHECK_ICMP==0: Check checksums by hardware for incoming ICMP packets.*/
   #define CHECKSUM_CHECK_ICMP             0
+  /* CHECKSUM_GEN_ICMP6==1: Generate checksums in software for outgoing ICMPv6 packets.*/
+  /* Hardware checksum insertion not supported when packet is an IPv6 fragment*/
+  #define CHECKSUM_GEN_ICMP6              1
+  /* CHECKSUM_CHECK_ICMP6==0: Check checksums by hardware for incoming ICMPv6 packets.*/
+  #define CHECKSUM_CHECK_ICMP6            0
 #else
   /* CHECKSUM_GEN_IP==1: Generate checksums in software for outgoing IP packets.*/
   #define CHECKSUM_GEN_IP                 1
@@ -176,6 +203,10 @@ The STM32H7xx allows computing and verifying the IP, UDP, TCP and ICMP checksums
   #define CHECKSUM_GEN_ICMP               1
   /* CHECKSUM_CHECK_ICMP==1: Check checksums by hardware for incoming ICMP packets.*/
   #define CHECKSUM_CHECK_ICMP             1
+  /* CHECKSUM_GEN_ICMP6==1: Generate checksums in software for outgoing ICMPv6 packets.*/
+  #define CHECKSUM_GEN_ICMP6              1
+  /* CHECKSUM_CHECK_ICMP6==1: Check checksums in software for incoming ICMPv6 packets.*/
+  #define CHECKSUM_CHECK_ICMP6            1
 #endif
 
 

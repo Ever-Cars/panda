@@ -79,15 +79,15 @@ static void tcp_echoserver_connection_close(struct tcp_pcb *tpcb, struct tcp_ech
   */
 void tcp_echoserver_init(void)
 {
-  /* create new tcp pcb */
-  tcp_echoserver_pcb = tcp_new();
+  /* create new tcp pcb accepting both IPv4 and IPv6 connections */
+  tcp_echoserver_pcb = tcp_new_ip_type(IPADDR_TYPE_ANY);
 
   if (tcp_echoserver_pcb != NULL)
   {
     err_t err;
     
     /* bind echo_pcb to port 7 (ECHO protocol) */
-    err = tcp_bind(tcp_echoserver_pcb, IP_ADDR_ANY, 7);
+    err = tcp_bind(tcp_echoserver_pcb, IP_ANY_TYPE, 7);
     
     if (err == ERR_OK)
     {

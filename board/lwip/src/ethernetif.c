@@ -25,6 +25,9 @@
 #include "ethernetif.h"
 #include "lan8742.h"
 #include "lwip_port.h"
+#if LWIP_IPV6
+#include "lwip/ethip6.h"
+#endif
 #include <string.h>
 
 /* Private typedef -----------------------------------------------------------*/
@@ -186,6 +189,16 @@ static void low_level_init(struct netif *netif)
   /* configure ethernet peripheral (GPIOs, clocks, MAC, DMA) */
   HAL_ETH_Init(&EthHandle);
 
+#if LWIP_IPV6
+  /* IPv6 neighbor discovery relies on multicast (33:33:xx:xx:xx:xx) frames,
+     which the MAC drops with its reset filter configuration */
+  ETH_MACFilterConfigTypeDef FilterConfig;
+  HAL_ETH_GetMACFilterConfig(&EthHandle, &FilterConfig);
+  FilterConfig.PassAllMulticast = ENABLE;
+  HAL_ETH_SetMACFilterConfig(&EthHandle, &FilterConfig);
+#endif
+
+
   /* set MAC hardware address length */
   netif->hwaddr_len = ETH_HWADDR_LEN;
 
@@ -198,6 +211,9 @@ static void low_level_init(struct netif *netif)
   /* device capabilities */
   /* don't set NETIF_FLAG_ETHARP if this device is not an ethernet one */
   netif->flags |= NETIF_FLAG_BROADCAST | NETIF_FLAG_ETHARP;
+#if LWIP_IPV6 && LWIP_IPV6_MLD
+  netif->flags |= NETIF_FLAG_MLD6;
+#endif
 
   /* Initialize the RX POOL */
   LWIP_MEMPOOL_INIT(RX_POOL);
@@ -358,6 +374,9 @@ err_t ethernetif_init(struct netif *netif)
    * is available...) */
   netif->output = etharp_output;
   netif->linkoutput = low_level_output;
+#if LWIP_IPV6
+  netif->output_ip6 = ethip6_output;
+#endif
 
   /* initialize the hardware */
   low_level_init(netif);

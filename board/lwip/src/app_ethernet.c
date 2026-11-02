@@ -29,6 +29,10 @@
 #include "ethernetif.h"
 #include "lwip_port.h"
 
+#if LWIP_IPV6
+NETIF_DECLARE_EXT_CALLBACK(ipv6_status_callback)
+#endif
+
 /* Private typedef -----------------------------------------------------------*/
 /* Private define ------------------------------------------------------------*/
 /* Private macro -------------------------------------------------------------*/
@@ -43,6 +47,53 @@ uint8_t DHCP_state = DHCP_OFF;
 
 /* Private function prototypes -----------------------------------------------*/
 /* Private functions ---------------------------------------------------------*/
+#if LWIP_IPV6
+static const char *ip6_addr_state_name(u8_t state)
+{
+  if (ip6_addr_istentative(state))
+    return "tentative";
+  if (ip6_addr_ispreferred(state))
+    return "preferred";
+  if (ip6_addr_isdeprecated(state))
+    return "deprecated";
+  if (ip6_addr_isduplicated(state))
+    return "duplicated";
+  return "invalid";
+}
+
+/**
+  * @brief  Report IPv6 address state transitions (DAD, SLAAC, lifetime expiry)
+  */
+static void ethernet_ipv6_status_changed(struct netif *netif, netif_nsc_reason_t reason,
+                                         const netif_ext_callback_args_t *args)
+{
+  char addrtxt[IP6ADDR_STRLEN_MAX];
+  s8_t index;
+
+  if (reason & LWIP_NSC_IPV6_ADDR_STATE_CHANGED)
+  {
+    index = args->ipv6_addr_state_changed.addr_index;
+    ip6addr_ntoa_r(netif_ip6_addr(netif, index), addrtxt, sizeof(addrtxt));
+    print("IPv6 address "); print(addrtxt); print(": ");
+    print(ip6_addr_state_name(netif_ip6_addr_state(netif, index))); print("\n");
+  }
+}
+
+/**
+  * @brief  Enable IPv6 on the network interface: EUI-64 link-local address
+  *         plus stateless autoconfiguration from Router Advertisements
+  * @param  netif: the network interface
+  * @retval None
+  */
+void ethernet_ipv6_init(struct netif *netif)
+{
+  netif_add_ext_callback(&ipv6_status_callback, ethernet_ipv6_status_changed);
+  netif_create_ip6_linklocal_address(netif, 1);
+  netif_set_ip6_autoconfig_enabled(netif, 1);
+}
+#endif /* LWIP_IPV6 */
+
+
 /**
   * @brief  Notify the User about the network interface config status
   * @param  netif: the network interface
@@ -96,11 +147,6 @@ void Ethernet_Link_Periodic_Handle(struct netif *netif)
   */
 void DHCP_Process(struct netif *netif)
 {
-  ip_addr_t ipaddr;
-  ip_addr_t netmask;
-  ip_addr_t gw;
-  struct dhcp *dhcp;
-
   switch (DHCP_state)
   {
     case DHCP_START:

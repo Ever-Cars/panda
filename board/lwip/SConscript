@@ -54,7 +54,17 @@ sources = [
   'ip4.c',
   'ip4_addr.c',
   'ip4_frag.c',
-)] + ['middlewares/lwip/src/netif/ethernet.c']
+)] + [f'middlewares/lwip/src/core/ipv6/{f}' for f in (
+  'dhcp6.c',
+  'ethip6.c',
+  'icmp6.c',
+  'inet6.c',
+  'ip6_addr.c',
+  'ip6_frag.c',
+  'ip6.c',
+  'mld6.c',
+  'nd6.c',
+)] + [f'middlewares/lwip/src/netif/ethernet.c']
 
 lwip_objs = [lenv.Object(s) for s in sources]
 Return('lwip_objs')
