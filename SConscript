@@ -94,6 +94,7 @@ def build_project(project_name, project, main, extra_flags):
     AS=PREFIX + 'gcc',
     OBJCOPY=PREFIX + 'objcopy',
     OBJDUMP=PREFIX + 'objdump',
+    SIZE=PREFIX + 'size',
     OBJPREFIX=project_dir,
     CFLAGS=flags,
     ASFLAGS=flags,
@@ -119,14 +120,21 @@ def build_project(project_name, project, main, extra_flags):
   ])
   bs_env.Objcopy(f"./board/obj/bootstub.{project_name}.bin", bs_elf)
 
+  # Add net objects if needed
+  net_objs = []
+  if '-DHAS_DOIP' in extra_flags:
+    net_objs = SConscript('board/net/SConscript', exports={'env': env})
+
   # Build + sign main (aka app)
   main_elf = env.Program(f"{project_dir}/main.elf", [
     startup,
     main
-  ], LINKFLAGS=[f"-Wl,--section-start,.isr_vector={project['APP_START_ADDRESS']}"] + flags)
+  ] + net_objs, LINKFLAGS=[f"-Wl,--section-start,.isr_vector={project['APP_START_ADDRESS']},--print-memory-usage"] + flags)
   main_bin = env.Objcopy(f"{project_dir}/main.bin", main_elf)
   sign_py = File(f"./board/crypto/sign.py").srcnode().relpath
   env.Command(f"./board/obj/{project_name}.bin.signed", main_bin, f"SETLEN=1 {sign_py} $SOURCE $TARGET {cert_fn}")
+
+  env.AddPostAction(main_elf, Action(f'$SIZE $TARGET', 'Size: $TARGET'))
 
 
 

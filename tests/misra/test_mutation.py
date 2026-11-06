@@ -23,6 +23,9 @@ IGNORED_PATHS = (
   'board/bootstub.c',
   'board/bootstub_declarations.h',
   'board/stm32h7/llflash.h',
+
+  # third party files
+  'board/net',
 )
 
 mutations = [
