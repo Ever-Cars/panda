@@ -26,6 +26,10 @@
 #include "board/can_comms.h"
 #include "board/main_comms.h"
 
+#ifdef HAS_DOIP
+  #include "board/drivers/eth.h"
+#endif
+
 #ifdef RICHIE
   #define BOARD_NAME "RICHIE"
 #else
@@ -279,6 +283,15 @@ static void tick_handler(void) {
   TICK_TIMER->SR = 0;
 }
 
+// Network work runs only here, from the main loop, so lwIP is never re-entered
+// and interrupts (CAN, safety) always preempt it.
+static void net_service(void) {
+#ifdef HAS_DOIP
+  eth_service();
+  net_poll();
+#endif
+}
+
 static void isotp_tick_handler(void) {
   if (ISOTP_TIMER->SR != 0U) {
     isotp_periodic_handler(microsecond_timer_get());
@@ -359,11 +372,17 @@ int main(void) {
   led_set(LED_GREEN, false);
   led_set(LED_BLUE, false);
 
+#ifdef HAS_DOIP
+  eth_init();
+  net_init();
+#endif
+
   print("**** INTERRUPTS ON ****\n");
   enable_interrupts();
 
   // LED should keep on blinking all the time
   while (true) {
+    net_service();
     #ifdef ALLOW_DEBUG
     if (stop_mode_requested) {
       enter_stop_mode();
@@ -379,6 +398,7 @@ int main(void) {
           delay(fade >> 4);
           led_set(LED_RED, false);
           delay((MAX_LED_FADE - fade) >> 4);
+          net_service();
         }
 
         for (uint32_t fade = MAX_LED_FADE; fade > 0U; fade -= 1U) {
@@ -386,6 +406,7 @@ int main(void) {
           delay(fade >> 4);
           led_set(LED_RED, false);
           delay((MAX_LED_FADE - fade) >> 4);
+          net_service();
         }
 
       #ifdef DEBUG_FAULTS
