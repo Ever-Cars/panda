@@ -13,17 +13,15 @@
 #include "net_api.h"
 #include "net_echo.h"
 
-// panda, board/drivers/uart.h
+// panda, board/drivers/uart.h and board/libc.h
 void print(const char *a);
 void puth(unsigned int i);
+void assert_fatal(bool condition, const char *msg);
 
 #define NET_RX_FRAMES_PER_POLL 8U
 
 // Frames dropped because the lwIP heap was full, readable over SWD
 uint32_t net_rx_no_mem;
-// Set by a failed lwIP assertion: lwIP state can no longer be trusted, so the
-// network stops being serviced. Safety and CAN are unaffected.
-bool net_failed;
 
 static struct netif net_netif;
 static bool net_link_up;
@@ -39,12 +37,14 @@ uint32_t net_rand(void) {
   return x;
 }
 
+// A failed lwIP assertion means its state is corrupt and the failing operation
+// must not resume. Take panda's fatal path: it never returns, so lwIP (which
+// only runs in the main loop) is stopped for good, while interrupts (CAN,
+// safety, USB/SPI, heartbeat) keep running. The LED fade stops as a visible sign.
 void net_platform_assert(const char *msg, int line, const char *file) {
-  if (!net_failed) {
-    net_failed = true;
-    print("lwIP assert, network stopped: "); print(msg); print(" at "); print(file);
-    print(":0x"); puth((unsigned int)line); print("\n");
-  }
+  print("lwIP assert at "); print(file); print(":0x"); puth((unsigned int)line); print("\n");
+  assert_fatal(false, msg);
+  while (true) {}  // assert_fatal(false, ...) hangs; this makes noreturn provable
 }
 
 u32_t sys_now(void) {
@@ -117,9 +117,6 @@ void net_init(void) {
 }
 
 void net_poll(void) {
-  if (net_failed) {
-    return;
-  }
   bool link_up = eth_link_is_up();
   if (link_up != net_link_up) {
     net_link_up = link_up;

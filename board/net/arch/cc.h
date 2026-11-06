@@ -7,7 +7,7 @@
 
 #define LWIP_NO_CTYPE_H 1
 
-void net_platform_assert(const char *msg, int line, const char *file);
+void net_platform_assert(const char *msg, int line, const char *file) __attribute__((noreturn));
 uint32_t net_rand(void);
 
 #define LWIP_PLATFORM_DIAG(x) do {} while (0)

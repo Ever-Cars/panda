@@ -23,6 +23,7 @@
 #define ETH_PHY_SCSR_FULL_DUPLEX (1UL << 4)
 
 #define ETH_LINK_POLL_US 100000U
+#define ETH_INIT_RETRY_US 1000000U  // each attempt busy-waits ~51 ms (PHY reset) + up to 10 ms
 #define ETH_TX_WAIT_US 500U  // ~4 full-size frames at 100 Mbit/s
 
 // Counters, readable over SWD without halting the core
@@ -41,22 +42,50 @@ typedef struct {
   uint32_t phy_errors;
   uint32_t dma_errors;
   uint32_t dma_error_status;
+  uint32_t init_failures;
 } eth_state_t;
 
 extern eth_state_t eth_state;
 eth_state_t eth_state;
 
 static uint8_t eth_mac[ETH_MAC_LEN];
-static bool eth_dma_reset_needed = false;  // set when the DMA failed to stop cleanly
-
-static void eth_stop(void) {
-  eth_dma_reset_needed = !lleth_stop();
-  eth_state.link_up = false;
-}
 
 static void eth_delay_us(uint32_t us) {
   uint32_t start = microsecond_timer_get();
   while (get_ts_elapsed(microsecond_timer_get(), start) < us) {}
+}
+
+// "initialized" means the MAC is reset and configured, ready for lleth_start().
+// It is cleared whenever the DMA fails to stop cleanly, so the rings are never
+// reprogrammed under a running DMA; eth_service() then retries the full init.
+static void eth_stop(void) {
+  if (!lleth_stop()) {
+    eth_state.initialized = false;
+  }
+  eth_state.link_up = false;
+}
+
+// Reset the PHY and the MAC together. The PHY must be reset too: after losing
+// its clock the LAN8742A can come back with a garbled RMII receive path (all
+// frames fail CRC) until it is reset. It then drives the 50 MHz RMII reference
+// clock that the MAC reset needs.
+static void eth_try_init(void) {
+  static uint32_t last_attempt_us = 0U;
+  static bool attempted = false;
+  uint32_t now = microsecond_timer_get();
+  if (!attempted || (get_ts_elapsed(now, last_attempt_us) >= ETH_INIT_RETRY_US)) {
+    attempted = true;
+    eth_state.link_up = false;  // a reset always restarts from link down
+    set_gpio_output(ETH_PHY_RESET_GPIO, ETH_PHY_RESET_PIN, false);
+    eth_delay_us(1000U);
+    set_gpio_output(ETH_PHY_RESET_GPIO, ETH_PHY_RESET_PIN, true);
+    eth_delay_us(50000U);
+    eth_state.initialized = lleth_init(eth_mac);
+    last_attempt_us = microsecond_timer_get();
+    if (!eth_state.initialized) {
+      eth_state.init_failures++;
+    }
+  }
 }
 
 // Hash the 96-bit unique ID (FNV-1a 64) so chips from the same wafer, whose IDs
@@ -75,11 +104,18 @@ static void eth_derive_mac(void) {
   }
 }
 
+// MDIO read that also fails when no PHY drives the bus (reads as all ones,
+// which would otherwise look like "link up, autonegotiation done").
+static bool eth_phy_read(uint32_t phy_reg, uint16_t *value) {
+  bool ok = lleth_mdio_read(ETH_PHY_ADDR, phy_reg, value);
+  return ok && (*value != 0xFFFFU);
+}
+
 static void eth_link_poll(void) {
   uint16_t bmsr = 0U;
   // Link status is latched low: the first read reports drops since the last poll
-  bool ok = lleth_mdio_read(ETH_PHY_ADDR, ETH_PHY_BMSR, &bmsr);
-  ok = ok && lleth_mdio_read(ETH_PHY_ADDR, ETH_PHY_BMSR, &bmsr);
+  bool ok = eth_phy_read(ETH_PHY_BMSR, &bmsr);
+  ok = ok && eth_phy_read(ETH_PHY_BMSR, &bmsr);
   if (!ok) {
     eth_state.phy_errors++;
   }
@@ -87,11 +123,7 @@ static void eth_link_poll(void) {
 
   if (link && !eth_state.link_up) {
     uint16_t scsr = 0U;
-    if (lleth_mdio_read(ETH_PHY_ADDR, ETH_PHY_SCSR, &scsr) && ((scsr & ETH_PHY_SCSR_AUTODONE) != 0U)) {
-      if (eth_dma_reset_needed) {
-        eth_state.initialized = lleth_init(eth_mac);
-        eth_dma_reset_needed = false;
-      }
+    if (eth_phy_read(ETH_PHY_SCSR, &scsr) && ((scsr & ETH_PHY_SCSR_AUTODONE) != 0U)) {
       eth_state.speed_100m = (scsr & ETH_PHY_SCSR_100M) != 0U;
       eth_state.full_duplex = (scsr & ETH_PHY_SCSR_FULL_DUPLEX) != 0U;
       lleth_start(eth_state.speed_100m, eth_state.full_duplex);
@@ -111,30 +143,24 @@ static void eth_link_poll(void) {
 
 void eth_init(void) {
   eth_derive_mac();
-
-  // The board powers the PHY and holds it in reset; release it and let it
-  // start driving the 50 MHz RMII reference clock that the MAC reset needs.
-  set_gpio_output(ETH_PHY_RESET_GPIO, ETH_PHY_RESET_PIN, false);
-  eth_delay_us(1000U);
-  set_gpio_output(ETH_PHY_RESET_GPIO, ETH_PHY_RESET_PIN, true);
-  eth_delay_us(50000U);
-
-  eth_state.initialized = lleth_init(eth_mac);
+  eth_try_init();  // the board powers the PHY and holds it in reset until here
   if (eth_state.initialized) {
-    bool ok = lleth_mdio_read(ETH_PHY_ADDR, ETH_PHY_ID1, &eth_state.phy_id1);
-    ok = ok && lleth_mdio_read(ETH_PHY_ADDR, ETH_PHY_ID2, &eth_state.phy_id2);
+    bool ok = eth_phy_read(ETH_PHY_ID1, &eth_state.phy_id1);
+    ok = ok && eth_phy_read(ETH_PHY_ID2, &eth_state.phy_id2);
     if (!ok) {
       eth_state.phy_errors++;
     }
     print("ETH init, PHY ID 0x"); puth(((uint32_t)eth_state.phy_id1 << 16) | eth_state.phy_id2); print("\n");
   } else {
-    print("ETH init failed: MAC reset timed out (no RMII reference clock?)\n");
+    print("ETH init failed: MAC reset timed out (no RMII reference clock?), retrying\n");
   }
 }
 
-// Link supervision and DMA error recovery. Main loop only.
+// Link supervision, MAC init retries and DMA error recovery. Main loop only.
 void eth_service(void) {
-  if (eth_state.initialized) {
+  if (!eth_state.initialized) {
+    eth_try_init();  // rate limited; link-up is only possible once this succeeds
+  } else {
     static uint32_t eth_link_poll_last_us = 0U;
     uint32_t now = microsecond_timer_get();
     if (get_ts_elapsed(now, eth_link_poll_last_us) >= ETH_LINK_POLL_US) {

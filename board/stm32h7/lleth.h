@@ -195,10 +195,10 @@ uint32_t lleth_dma_status(void) {
   return status;
 }
 
-bool lleth_mdio_read(uint32_t phy, uint32_t reg, uint16_t *value) {
+bool lleth_mdio_read(uint32_t phy, uint32_t phy_reg, uint16_t *value) {
   bool ret = lleth_wait_clear(&(ETH->MACMDIOAR), ETH_MACMDIOAR_MB);
   if (ret) {
-    ETH->MACMDIOAR = (phy << ETH_MACMDIOAR_PA_Pos) | (reg << ETH_MACMDIOAR_RDA_Pos) |
+    ETH->MACMDIOAR = (phy << ETH_MACMDIOAR_PA_Pos) | (phy_reg << ETH_MACMDIOAR_RDA_Pos) |
                      ETH_MACMDIOAR_CR_DIV62 | LLETH_MDIO_GOC_READ | ETH_MACMDIOAR_MB;
     ret = lleth_wait_clear(&(ETH->MACMDIOAR), ETH_MACMDIOAR_MB);
   }
