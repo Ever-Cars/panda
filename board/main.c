@@ -289,6 +289,10 @@ static void net_service(void) {
 #ifdef HAS_DOIP
   eth_service();
   net_poll();
+  // Only power save sleeps in WFI and needs a receive wake-up
+  if (power_save_enabled) {
+    eth_rx_wake_arm();
+  }
 #endif
 }
 

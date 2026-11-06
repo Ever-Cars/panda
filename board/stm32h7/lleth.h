@@ -118,6 +118,13 @@ bool lleth_init(const uint8_t mac[ETH_MAC_LEN]) {
   ret = lleth_wait_clear(&(ETH->DMAMR), ETH_DMAMR_SWR);
 
   if (ret) {
+    // The MMC statistics counters raise ETH interrupts at half/full scale that
+    // nothing here would clear: mask them all (as ST's HAL does)
+    register_set_bits(&(ETH->MMCRIMR), ETH_MMCRIMR_RXLPITRCIM | ETH_MMCRIMR_RXLPIUSCIM | ETH_MMCRIMR_RXUCGPIM |
+                                       ETH_MMCRIMR_RXALGNERPIM | ETH_MMCRIMR_RXCRCERPIM);
+    register_set_bits(&(ETH->MMCTIMR), ETH_MMCTIMR_TXLPITRCIM | ETH_MMCTIMR_TXLPIUSCIM | ETH_MMCTIMR_TXGPKTIM |
+                                       ETH_MMCTIMR_TXMCOLGPIM | ETH_MMCTIMR_TXSCOLGPIM);
+
     // MDC = HCLK / 62 (HCLK in 100-150 MHz), 1 us tick for the MAC
     ETH->MACMDIOAR = ETH_MACMDIOAR_CR_DIV62;
     register_set(&(ETH->MAC1USTCR), LLETH_HCLK_MHZ - 1U, ETH_MAC1USTCR_TIC1USCNTR);
@@ -170,14 +177,15 @@ void lleth_start(bool speed_100m, bool full_duplex) {
   register_set(&(ETH->MACCR), maccr | ETH_MACCR_TE | ETH_MACCR_RE, LLETH_MACCR_MASK);
 }
 
-// Stop DMA and MAC, waiting for both DMA engines to reach the stopped state so
-// lleth_start() can safely reprogram the descriptor rings.
-void lleth_stop(void) {
+// Stop DMA and MAC. Returns false if a DMA engine did not reach the stopped
+// state; the rings must then not be reprogrammed without a full lleth_init().
+bool lleth_stop(void) {
   ETH->DMACTCR &= ~ETH_DMACTCR_ST;
-  (void)lleth_wait_clear(&(ETH->DMADSR), ETH_DMADSR_TPS);
+  bool ok = lleth_wait_clear(&(ETH->DMADSR), ETH_DMADSR_TPS);
   register_set(&(ETH->MACCR), ETH_MACCR_ACS | ETH_MACCR_CST, LLETH_MACCR_MASK);
   ETH->DMACRCR &= ~ETH_DMACRCR_SR;
-  (void)lleth_wait_clear(&(ETH->DMADSR), ETH_DMADSR_RPS);
+  ok = lleth_wait_clear(&(ETH->DMADSR), ETH_DMADSR_RPS) && ok;
+  return ok;
 }
 
 // Returns the DMA channel status and clears it (write-1-to-clear).

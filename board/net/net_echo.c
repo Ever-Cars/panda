@@ -39,6 +39,7 @@ static err_t net_echo_close(struct tcp_pcb *pcb, struct pbuf *pending) {
   tcp_recv(pcb, NULL);
   tcp_sent(pcb, NULL);
   tcp_err(pcb, NULL);
+  tcp_poll(pcb, NULL, 0U);
   if (tcp_close(pcb) != ERR_OK) {
     tcp_abort(pcb);
     ret = ERR_ABRT;
@@ -71,6 +72,13 @@ static err_t net_echo_sent(void *arg, struct tcp_pcb *pcb, u16_t len) {
   return ERR_OK;
 }
 
+// Retry every 500 ms: if tcp_write() failed for lack of memory while nothing
+// was in flight, no sent callback would ever come to flush the pending data.
+static err_t net_echo_poll(void *arg, struct tcp_pcb *pcb) {
+  net_echo_flush(pcb, (struct pbuf *)arg);
+  return ERR_OK;
+}
+
 static void net_echo_error(void *arg, err_t err) {
   (void)err;
   if (arg != NULL) {
@@ -85,6 +93,7 @@ static err_t net_echo_accept(void *arg, struct tcp_pcb *pcb, err_t err) {
   tcp_recv(pcb, net_echo_recv);
   tcp_sent(pcb, net_echo_sent);
   tcp_err(pcb, net_echo_error);
+  tcp_poll(pcb, net_echo_poll, 1U);
   return ERR_OK;
 }
 

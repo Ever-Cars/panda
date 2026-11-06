@@ -47,6 +47,12 @@ extern eth_state_t eth_state;
 eth_state_t eth_state;
 
 static uint8_t eth_mac[ETH_MAC_LEN];
+static bool eth_dma_reset_needed = false;  // set when the DMA failed to stop cleanly
+
+static void eth_stop(void) {
+  eth_dma_reset_needed = !lleth_stop();
+  eth_state.link_up = false;
+}
 
 static void eth_delay_us(uint32_t us) {
   uint32_t start = microsecond_timer_get();
@@ -82,6 +88,10 @@ static void eth_link_poll(void) {
   if (link && !eth_state.link_up) {
     uint16_t scsr = 0U;
     if (lleth_mdio_read(ETH_PHY_ADDR, ETH_PHY_SCSR, &scsr) && ((scsr & ETH_PHY_SCSR_AUTODONE) != 0U)) {
+      if (eth_dma_reset_needed) {
+        eth_state.initialized = lleth_init(eth_mac);
+        eth_dma_reset_needed = false;
+      }
       eth_state.speed_100m = (scsr & ETH_PHY_SCSR_100M) != 0U;
       eth_state.full_duplex = (scsr & ETH_PHY_SCSR_FULL_DUPLEX) != 0U;
       lleth_start(eth_state.speed_100m, eth_state.full_duplex);
@@ -91,8 +101,7 @@ static void eth_link_poll(void) {
       print(eth_state.full_duplex ? " Mbit full duplex\n" : " Mbit half duplex\n");
     }
   } else if (!link && eth_state.link_up) {
-    lleth_stop();
-    eth_state.link_up = false;
+    eth_stop();
     eth_state.link_changes++;
     print("ETH link down\n");
   } else {
@@ -138,13 +147,17 @@ void eth_service(void) {
       // Fatal bus error stops the DMA: restart it on the next link poll
       eth_state.dma_errors++;
       eth_state.dma_error_status = status;
-      lleth_stop();
-      eth_state.link_up = false;
+      eth_stop();
     }
+  }
+}
 
-    if (eth_state.link_up) {
-      lleth_rx_irq_arm();
-    }
+// Let the next received frame wake the main loop out of WFI (power save).
+// Call after the network has been serviced: a frame that completed meanwhile
+// has RI latched and wakes the loop immediately.
+void eth_rx_wake_arm(void) {
+  if (eth_state.link_up) {
+    lleth_rx_irq_arm();
   }
 }
 
