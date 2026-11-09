@@ -270,15 +270,11 @@ bool eth_tx_frame_send(uint16_t len) {
 
 // cppcheck-suppress misra-c2012-8.7 ; called from the separately compiled lwIP glue (board/net)
 uint32_t eth_millis(void) {
-  static uint32_t eth_clock_last_us = 0U;
-  static uint32_t eth_clock_rem_us = 0U;
   static uint32_t eth_clock_ms = 0U;
 
-  uint32_t now = microsecond_timer_get();
-  eth_clock_rem_us += get_ts_elapsed(now, eth_clock_last_us);
-  eth_clock_last_us = now;
-  eth_clock_ms += eth_clock_rem_us / 1000U;
-  eth_clock_rem_us %= 1000U;
+  // Unsigned arithmetic handles timer wrap; sub-ms time carries forward.
+  // Requires calls <71 min apart (normal lwIP polling) and no timer reset.
+  eth_clock_ms += (microsecond_timer_get() - (eth_clock_ms * 1000U)) / 1000U;
   return eth_clock_ms;
 }
 
