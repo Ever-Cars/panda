@@ -147,8 +147,6 @@ bool lleth_init(const uint8_t mac[ETH_MAC_LEN]) {
     register_set(&(ETH->DMACRCR), (32UL << ETH_DMACRCR_RPBL_Pos) | (LLETH_BUF_SIZE << ETH_DMACRCR_RBSZ_Pos),
                  ETH_DMACRCR_RPBL | ETH_DMACRCR_RBSZ);
 
-    lleth_rings_init();
-
     REGISTER_INTERRUPT(ETH_IRQn, lleth_irq_handler, 20000U, FAULT_INTERRUPT_RATE_ETH)
     NVIC_EnableIRQ(ETH_IRQn);
   }
