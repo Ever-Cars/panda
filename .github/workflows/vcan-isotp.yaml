@@ -22,7 +22,11 @@ jobs:
       - name: Install SocketCAN dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends linux-modules-extra-$(uname -r) can-utils
+          sudo apt-get install -y --no-install-recommends "linux-modules-$(uname -r)" can-utils
+          # Newer Azure kernels include CAN drivers in linux-modules; older kernels need extras.
+          if apt-cache show "linux-modules-extra-$(uname -r)" >/dev/null 2>&1; then
+            sudo apt-get install -y --no-install-recommends "linux-modules-extra-$(uname -r)"
+          fi
 
       - name: Setup project
         run: ./setup.sh
