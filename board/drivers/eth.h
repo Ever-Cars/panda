@@ -45,8 +45,7 @@ typedef struct {
   uint32_t init_failures;
 } eth_state_t;
 
-extern eth_state_t eth_state;
-eth_state_t eth_state;
+static eth_state_t eth_state;
 
 static uint8_t eth_mac[ETH_MAC_LEN];
 
@@ -72,14 +71,17 @@ static void eth_stop(void) {
 static void eth_try_init(void) {
   static uint32_t last_attempt_us = 0U;
   static bool attempted = false;
+
   uint32_t now = microsecond_timer_get();
   if (!attempted || (get_ts_elapsed(now, last_attempt_us) >= ETH_INIT_RETRY_US)) {
     attempted = true;
     eth_state.link_up = false;  // a reset always restarts from link down
+
     set_gpio_output(ETH_PHY_RESET_GPIO, ETH_PHY_RESET_PIN, false);
     eth_delay_us(1000U);
     set_gpio_output(ETH_PHY_RESET_GPIO, ETH_PHY_RESET_PIN, true);
     eth_delay_us(50000U);
+
     eth_state.initialized = lleth_init(eth_mac);
     last_attempt_us = microsecond_timer_get();
     if (!eth_state.initialized) {
@@ -97,6 +99,7 @@ static void eth_derive_mac(void) {
     hash ^= uid[i];
     hash *= 0x100000001B3ULL;
   }
+
   eth_mac[0] = 0x02U;  // locally administered, unicast
   for (uint32_t i = 1U; i < ETH_MAC_LEN; i++) {
     eth_mac[i] = (uint8_t)(hash & 0xFFU);
@@ -113,12 +116,14 @@ static bool eth_phy_read(uint32_t phy_reg, uint16_t *value) {
 
 static void eth_link_poll(void) {
   uint16_t bmsr = 0U;
-  // Link status is latched low: the first read reports drops since the last poll
+  // Link status is latched low: the first read only clears drops since the
+  // last poll, the second reports the current state
+  (void)eth_phy_read(ETH_PHY_BMSR, &bmsr);
   bool ok = eth_phy_read(ETH_PHY_BMSR, &bmsr);
-  ok = ok && eth_phy_read(ETH_PHY_BMSR, &bmsr);
   if (!ok) {
     eth_state.phy_errors++;
   }
+
   bool link = ok && ((bmsr & ETH_PHY_BMSR_LINK) != 0U);
 
   if (link && !eth_state.link_up) {
@@ -144,12 +149,14 @@ static void eth_link_poll(void) {
 void eth_init(void) {
   eth_derive_mac();
   eth_try_init();  // the board powers the PHY and holds it in reset until here
+
   if (eth_state.initialized) {
     bool ok = eth_phy_read(ETH_PHY_ID1, &eth_state.phy_id1);
     ok = ok && eth_phy_read(ETH_PHY_ID2, &eth_state.phy_id2);
     if (!ok) {
       eth_state.phy_errors++;
     }
+
     print("ETH init, PHY ID 0x"); puth(((uint32_t)eth_state.phy_id1 << 16) | eth_state.phy_id2); print("\n");
   } else {
     print("ETH init failed: MAC reset timed out (no RMII reference clock?), retrying\n");
@@ -221,10 +228,10 @@ uint8_t *eth_tx_buffer_get(void) {
   uint8_t *buf = NULL;
   if (eth_state.link_up) {
     uint32_t start = microsecond_timer_get();
-    buf = lleth_tx_buffer_get();
-    while ((buf == NULL) && (get_ts_elapsed(microsecond_timer_get(), start) < ETH_TX_WAIT_US)) {
+    do {
       buf = lleth_tx_buffer_get();
-    }
+    } while ((buf == NULL) && (get_ts_elapsed(microsecond_timer_get(), start) < ETH_TX_WAIT_US));
+
     if (buf == NULL) {
       eth_state.tx_ring_full++;
     }
@@ -248,6 +255,7 @@ uint32_t eth_millis(void) {
   static uint32_t eth_clock_last_us = 0U;
   static uint32_t eth_clock_rem_us = 0U;
   static uint32_t eth_clock_ms = 0U;
+
   uint32_t now = microsecond_timer_get();
   eth_clock_rem_us += get_ts_elapsed(now, eth_clock_last_us);
   eth_clock_last_us = now;

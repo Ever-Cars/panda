@@ -14,9 +14,9 @@
 #include "net_echo.h"
 
 // panda, board/drivers/uart.h and board/libc.h
-void print(const char *a);
-void puth(unsigned int i);
-void assert_fatal(bool condition, const char *msg);
+extern void print(const char *a);
+extern void puth(unsigned int i);
+extern void assert_fatal(bool condition, const char *msg);
 
 #define NET_RX_FRAMES_PER_POLL 8U
 
@@ -33,6 +33,7 @@ uint32_t net_rand(void) {
   x ^= x << 13;
   x ^= x >> 17;
   x ^= x << 5;
+
   net_rand_state = x;
   return x;
 }
@@ -63,6 +64,7 @@ static err_t net_linkoutput(struct netif *netif, struct pbuf *p) {
       err = eth_tx_frame_send(p->tot_len) ? ERR_OK : ERR_IF;
     }
   }
+
   return err;
 }
 
@@ -70,10 +72,12 @@ static err_t net_netif_init(struct netif *netif) {
   netif->name[0] = 'e';
   netif->name[1] = 'n';
   netif->hostname = "richie";
+
   netif->mtu = 1500;
   netif->mtu6 = 1500;
   netif->hwaddr_len = ETH_MAC_LEN;
   eth_get_mac(netif->hwaddr);
+
   netif->flags = NETIF_FLAG_BROADCAST | NETIF_FLAG_ETHARP | NETIF_FLAG_ETHERNET | NETIF_FLAG_MLD6;
   netif->output = etharp_output;
   netif->output_ip6 = ethip6_output;
@@ -87,6 +91,7 @@ static void net_status_callback(struct netif *netif, netif_nsc_reason_t reason, 
     print(dhcp_supplied_address(netif) ? "NET IPv4 (DHCP): " : "NET IPv4: ");
     print(ip4addr_ntoa_r(netif_ip4_addr(netif), buf, (int)sizeof(buf))); print("\n");
   }
+
   if ((reason & LWIP_NSC_IPV6_ADDR_STATE_CHANGED) != 0U) {
     s8_t i = args->ipv6_addr_state_changed.addr_index;
     if (ip6_addr_ispreferred(netif_ip6_addr_state(netif, i))) {
@@ -133,6 +138,7 @@ void net_poll(void) {
     if (frame == NULL) {
       break;
     }
+
     // Received frames share the lwIP heap with transmit data (no pbuf pool)
     struct pbuf *p = pbuf_alloc(PBUF_RAW, len, PBUF_RAM);
     if (p != NULL) {
@@ -141,6 +147,7 @@ void net_poll(void) {
       net_rx_no_mem++;
     }
     eth_rx_frame_release();
+
     if ((p != NULL) && (net_netif.input(p, &net_netif) != ERR_OK)) {
       pbuf_free(p);
     }

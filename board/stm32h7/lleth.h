@@ -45,15 +45,11 @@ static uint32_t lleth_rx_idx = 0U;
 static uint32_t lleth_tx_idx = 0U;
 
 static bool lleth_wait_clear(volatile const uint32_t *reg, uint32_t mask) {
-  bool ret = true;
   uint32_t start = microsecond_timer_get();
-  while ((*reg & mask) != 0U) {
-    if (get_ts_elapsed(microsecond_timer_get(), start) > LLETH_TIMEOUT_US) {
-      ret = false;
-      break;
-    }
-  }
-  return ret;
+  while (((*reg & mask) != 0U) && (get_ts_elapsed(microsecond_timer_get(), start) <= LLETH_TIMEOUT_US)) {}
+
+  // Check the bits once more: they may have cleared just as the timeout expired
+  return (*reg & mask) == 0U;
 }
 
 static uint32_t lleth_desc_addr(const volatile lleth_desc_t *desc) {
@@ -75,9 +71,11 @@ static void lleth_rings_init(void) {
     lleth_tx_desc[i].des2 = 0U;
     lleth_tx_desc[i].des3 = 0U;
   }
+
   for (uint32_t i = 0U; i < LLETH_RX_DESC_CNT; i++) {
     lleth_rx_desc_arm(i);
   }
+
   lleth_rx_idx = 0U;
   lleth_tx_idx = 0U;
   __DSB();
@@ -131,6 +129,7 @@ bool lleth_init(const uint8_t mac[ETH_MAC_LEN]) {
 
     // Strip FCS on receive. Speed, duplex and RE/TE are set in lleth_start().
     register_set(&(ETH->MACCR), ETH_MACCR_ACS | ETH_MACCR_CST, LLETH_MACCR_MASK);
+
     // Unicast to us, broadcast and all multicast (IPv6 neighbor discovery)
     register_set(&(ETH->MACPFR), ETH_MACPFR_PM, 0xFFFFFFFFU);
     register_set(&(ETH->MACA0HR), ((uint32_t)mac[5] << 8) | mac[4], 0xFFFFU);
@@ -153,6 +152,7 @@ bool lleth_init(const uint8_t mac[ETH_MAC_LEN]) {
     REGISTER_INTERRUPT(ETH_IRQn, lleth_irq_handler, 20000U, FAULT_INTERRUPT_RATE_ETH)
     NVIC_EnableIRQ(ETH_IRQn);
   }
+
   return ret;
 }
 
@@ -182,9 +182,12 @@ void lleth_start(bool speed_100m, bool full_duplex) {
 bool lleth_stop(void) {
   ETH->DMACTCR &= ~ETH_DMACTCR_ST;
   bool ok = lleth_wait_clear(&(ETH->DMADSR), ETH_DMADSR_TPS);
+
   register_set(&(ETH->MACCR), ETH_MACCR_ACS | ETH_MACCR_CST, LLETH_MACCR_MASK);
+
   ETH->DMACRCR &= ~ETH_DMACRCR_SR;
   ok = lleth_wait_clear(&(ETH->DMADSR), ETH_DMADSR_RPS) && ok;
+
   return ok;
 }
 
@@ -202,9 +205,11 @@ bool lleth_mdio_read(uint32_t phy, uint32_t phy_reg, uint16_t *value) {
                      ETH_MACMDIOAR_CR_DIV62 | LLETH_MDIO_GOC_READ | ETH_MACMDIOAR_MB;
     ret = lleth_wait_clear(&(ETH->MACMDIOAR), ETH_MACMDIOAR_MB);
   }
+
   if (ret) {
     *value = (uint16_t)(ETH->MACMDIODR & 0xFFFFU);
   }
+
   return ret;
 }
 
@@ -227,8 +232,9 @@ const uint8_t *lleth_rx_frame_get(uint16_t *len, uint32_t *dropped) {
     if ((des3 & LLETH_DES3_OWN) != 0U) {
       done = true;  // still owned by the DMA: nothing (more) received
     } else {
-      bool whole = (des3 & (LLETH_DES3_FD | LLETH_DES3_LD)) == (LLETH_DES3_FD | LLETH_DES3_LD);
-      bool ok = whole && ((des3 & (LLETH_DES3_CTXT | LLETH_RDES3_ES)) == 0U);
+      // A whole frame in one buffer (first and last segment), no context descriptor, no errors
+      bool ok = ((des3 & (LLETH_DES3_FD | LLETH_DES3_LD)) == (LLETH_DES3_FD | LLETH_DES3_LD)) &&
+                ((des3 & (LLETH_DES3_CTXT | LLETH_RDES3_ES)) == 0U);
       uint16_t length = (uint16_t)(des3 & LLETH_RDES3_PL_MASK);
       if (ok && (length > 0U) && (length <= LLETH_BUF_SIZE)) {
         *len = length;
@@ -240,6 +246,7 @@ const uint8_t *lleth_rx_frame_get(uint16_t *len, uint32_t *dropped) {
       }
     }
   }
+
   return frame;
 }
 
