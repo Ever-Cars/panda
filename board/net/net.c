@@ -19,11 +19,13 @@ extern void puth(unsigned int i);
 extern void assert_fatal(bool condition, const char *msg);
 
 #define NET_RX_FRAMES_PER_POLL 8U
+#define NET_HOSTNAME_PREFIX_LEN 6U  // "panda-"
 
 // Frames dropped because the lwIP heap was full, readable over SWD
 uint32_t net_rx_no_mem;
 
 static struct netif net_netif;
+static char net_hostname[NET_HOSTNAME_PREFIX_LEN + ETH_SERIAL_LEN + 1U] = "panda-";
 static bool net_link_up;
 static uint32_t net_rand_state;
 
@@ -71,7 +73,10 @@ static err_t net_linkoutput(struct netif *netif, struct pbuf *p) {
 static err_t net_netif_init(struct netif *netif) {
   netif->name[0] = 'e';
   netif->name[1] = 'n';
-  netif->hostname = "richie";
+
+  // DHCP hostname: "panda-" + the panda serial, as on USB and in bifrost's panda_id
+  eth_get_serial(&net_hostname[NET_HOSTNAME_PREFIX_LEN]);
+  netif->hostname = net_hostname;
 
   netif->mtu = 1500;
   netif->mtu6 = 1500;

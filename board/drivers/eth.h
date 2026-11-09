@@ -213,6 +213,18 @@ void eth_get_mac(uint8_t mac[ETH_MAC_LEN]) {
 }
 
 // cppcheck-suppress misra-c2012-8.7 ; called from the separately compiled lwIP glue (board/net)
+void eth_get_serial(char serial[ETH_SERIAL_LEN + 1U]) {
+  static const char hex[] = "0123456789abcdef";
+  const uint8_t *uid = (const uint8_t *)UID_BASE;
+  for (uint32_t i = 0U; i < (ETH_SERIAL_LEN / 2U); i++) {
+    serial[2U * i] = hex[uid[i] >> 4];
+    serial[(2U * i) + 1U] = hex[uid[i] & 0xFU];
+  }
+
+  serial[ETH_SERIAL_LEN] = '\0';
+}
+
+// cppcheck-suppress misra-c2012-8.7 ; called from the separately compiled lwIP glue (board/net)
 const uint8_t *eth_rx_frame_get(uint16_t *len) {
   const uint8_t *frame = NULL;
   if (eth_state.link_up) {

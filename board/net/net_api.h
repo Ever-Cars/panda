@@ -9,6 +9,7 @@
 
 #define ETH_MAC_LEN 6U
 #define ETH_FRAME_MAX_LEN 1522U  // 1518 byte frame + 802.1Q tag, no FCS
+#define ETH_SERIAL_LEN 24U  // 96-bit MCU unique ID in hex, as panda's USB serial
 
 // ***** Implemented by panda (board/drivers/eth.h) *****
 
@@ -17,6 +18,9 @@ bool eth_link_is_up(void);
 
 // MAC address derived from the MCU unique ID (locally administered, unicast).
 void eth_get_mac(uint8_t mac[ETH_MAC_LEN]);
+
+// Panda serial (MCU unique ID as ETH_SERIAL_LEN hex characters) plus a NUL.
+void eth_get_serial(char serial[ETH_SERIAL_LEN + 1U]);
 
 // Received frame without FCS, or NULL when none is pending. The frame stays
 // valid until eth_rx_frame_release(), which must be called for every frame.
