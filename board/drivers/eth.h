@@ -22,8 +22,12 @@
 #define ETH_PHY_SCSR_100M (1UL << 3)
 #define ETH_PHY_SCSR_FULL_DUPLEX (1UL << 4)
 
+#define ETH_PHY_POWER_UP_US 40000U  // 25 ms after supplies are up + load switch turn-on + margin
+#define ETH_PHY_RESET_US 200U  // nRST low time: 100 us minimum
+#define ETH_PHY_READY_US 50000U  // reset release to MAC reset
+
 #define ETH_LINK_POLL_US 100000U
-#define ETH_INIT_RETRY_US 1000000U  // each attempt busy-waits ~51 ms (PHY reset) + up to 10 ms
+#define ETH_RESET_RETRY_US 1000000U  // each eth_reset() busy-waits ~50 ms (PHY) + up to 10 ms (MAC)
 #define ETH_TX_WAIT_US 500U  // ~4 full-size frames at 100 Mbit/s
 
 // Counters, readable over SWD without halting the core
@@ -68,25 +72,17 @@ static void eth_stop(void) {
 // its clock the LAN8742A can come back with a garbled RMII receive path (all
 // frames fail CRC) until it is reset. It then drives the 50 MHz RMII reference
 // clock that the MAC reset needs.
-static void eth_try_init(void) {
-  static uint32_t last_attempt_us = 0U;
-  static bool attempted = false;
+static void eth_reset(void) {
+  eth_state.link_up = false;  // a reset always restarts from link down
 
-  uint32_t now = microsecond_timer_get();
-  if (!attempted || (get_ts_elapsed(now, last_attempt_us) >= ETH_INIT_RETRY_US)) {
-    attempted = true;
-    eth_state.link_up = false;  // a reset always restarts from link down
+  set_gpio_output(ETH_PHY_RESET_GPIO, ETH_PHY_RESET_PIN, false);
+  eth_delay_us(ETH_PHY_RESET_US);
+  set_gpio_output(ETH_PHY_RESET_GPIO, ETH_PHY_RESET_PIN, true);
+  eth_delay_us(ETH_PHY_READY_US);
 
-    set_gpio_output(ETH_PHY_RESET_GPIO, ETH_PHY_RESET_PIN, false);
-    eth_delay_us(1000U);
-    set_gpio_output(ETH_PHY_RESET_GPIO, ETH_PHY_RESET_PIN, true);
-    eth_delay_us(50000U);
-
-    eth_state.initialized = lleth_init(eth_mac);
-    last_attempt_us = microsecond_timer_get();
-    if (!eth_state.initialized) {
-      eth_state.init_failures++;
-    }
+  eth_state.initialized = lleth_init(eth_mac);
+  if (!eth_state.initialized) {
+    eth_state.init_failures++;
   }
 }
 
@@ -148,7 +144,11 @@ static void eth_link_poll(void) {
 
 void eth_init(void) {
   eth_derive_mac();
-  eth_try_init();  // the board powers the PHY and holds it in reset until here
+
+  // The board powered the PHY with reset held low. Waiting the full power-up
+  // time here guarantees it however long ago that was.
+  eth_delay_us(ETH_PHY_POWER_UP_US);
+  eth_reset();
 
   if (eth_state.initialized) {
     bool ok = eth_phy_read(ETH_PHY_ID1, &eth_state.phy_id1);
@@ -166,7 +166,13 @@ void eth_init(void) {
 // Link supervision, MAC init retries and DMA error recovery. Main loop only.
 void eth_service(void) {
   if (!eth_state.initialized) {
-    eth_try_init();  // rate limited; link-up is only possible once this succeeds
+    // Retry at a limited rate; link-up is only possible once a reset succeeds
+    static uint32_t eth_reset_last_us = 0U;
+    uint32_t now = microsecond_timer_get();
+    if (get_ts_elapsed(now, eth_reset_last_us) >= ETH_RESET_RETRY_US) {
+      eth_reset_last_us = now;
+      eth_reset();
+    }
   } else {
     static uint32_t eth_link_poll_last_us = 0U;
     uint32_t now = microsecond_timer_get();

@@ -364,6 +364,13 @@ int main(void) {
 #ifdef DEBUG
   print("DEBUG ENABLED\n");
 #endif
+
+#ifdef HAS_DOIP
+  // Before usb_init(): eth_init() busy-waits ~90 ms for the PHY
+  eth_init();
+  net_init();
+#endif
+
   // enable USB (right before interrupts or enum can fail!)
   usb_init();
 
@@ -375,11 +382,6 @@ int main(void) {
   led_set(LED_RED, false);
   led_set(LED_GREEN, false);
   led_set(LED_BLUE, false);
-
-#ifdef HAS_DOIP
-  eth_init();
-  net_init();
-#endif
 
   print("**** INTERRUPTS ON ****\n");
   enable_interrupts();

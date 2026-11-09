@@ -54,11 +54,12 @@ static void richie_init_ethernet(void) {
   richie_init_eth_pin(GPIOG, 13);
   richie_init_eth_pin(GPIOG, 14);
 
-  // E5: PHY power enable, E0: PHY reset (held low until eth_init releases it)
-  set_gpio_pullup(GPIOE, 5, PULL_NONE);
-  set_gpio_output(GPIOE, 5, true);
+  // E0: PHY reset, E5: PHY power enable. Reset is asserted before power comes
+  // up and held low until eth_init() releases it.
   set_gpio_pullup(GPIOE, 0, PULL_NONE);
   set_gpio_output(GPIOE, 0, false);
+  set_gpio_pullup(GPIOE, 5, PULL_NONE);
+  set_gpio_output(GPIOE, 5, true);
 
   // A8: MCO1 = HSE (25 MHz) clocks the PHY crystal input
   set_gpio_pullup(GPIOA, 8, PULL_NONE);
