@@ -192,8 +192,8 @@ void eth_service(void) {
 }
 
 // Let the next received frame wake the main loop out of WFI (power save).
-// Call after the network has been serviced: a frame that completed meanwhile
-// has RI latched and wakes the loop immediately.
+// Call with interrupts masked right before WFI: a frame that completed since
+// the network was serviced has RI latched and wakes the loop immediately.
 void eth_rx_wake_arm(void) {
   if (eth_state.link_up) {
     lleth_rx_irq_arm();
