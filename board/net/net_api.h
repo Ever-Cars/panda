@@ -45,7 +45,8 @@ void net_get_serial(char serial[ETH_SERIAL_LEN + 1U]);
 
 // ***** Implemented by the lwIP side (board/net/net.c) *****
 
-// Bring up Ethernet, lwIP, the network interface, DHCP/AutoIP and IPv6 SLAAC.
+// Bring up Ethernet and lwIP with concurrent IPv4 AutoIP/APIPA and IPv6
+// link-local/SLAAC.
 void net_init(void);
 
 // Service Ethernet, then process received frames, link changes and lwIP

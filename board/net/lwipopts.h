@@ -34,15 +34,14 @@ void *net_memcpy(void *dest, const void *src, size_t n);
 #define LWIP_NETIF_EXT_STATUS_CALLBACK  1
 #define ARP_TABLE_SIZE                  4
 
-// ---------- IPv4: DHCP, falling back to AutoIP link-local ----------
-#define LWIP_DHCP                       1
+// ---------- IPv4: always start with AutoIP/APIPA link-local ----------
+#define LWIP_IPV4                       1
 #define LWIP_AUTOIP                     1
-#define LWIP_DHCP_AUTOIP_COOP           1
-#define LWIP_DHCP_AUTOIP_COOP_TRIES     3
+#define LWIP_DHCP                       1  // available for later configuration; not started at boot
 #define IP_REASSEMBLY                   0
 #define IP_FRAG                         0
 
-// ---------- IPv6: link-local + SLAAC ----------
+// ---------- IPv6: link-local + SLAAC, concurrent with IPv4 AutoIP ----------
 #define LWIP_IPV6                       1
 #define LWIP_IPV6_FRAG                  0
 #define LWIP_IPV6_REASS                 0
