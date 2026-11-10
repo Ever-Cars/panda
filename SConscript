@@ -187,11 +187,8 @@ hh, ch, jh = version_hash("board/health.h"), version_hash(os.path.join(opendbc.I
 common_flags += [f"-DHEALTH_PACKET_VERSION=0x{hh:08X}U", f"-DCAN_PACKET_VERSION_HASH=0x{ch:08X}U",
                  f"-DJUNGLE_HEALTH_PACKET_VERSION=0x{jh:08X}U"]
 
-# panda fw (default: richie_rev3)
-build_project("panda_h7", base_project_h7, "./board/main.c", ['-DRICHIE', '-DRICHIE_REV3'])
-
-# panda fw with Ethernet/lwIP for DoIP (richie_rev3)
-build_project("panda_h7_doip", base_project_h7, "./board/main.c", ['-DRICHIE', '-DRICHIE_REV3', '-DHAS_DOIP'])
+# panda fw (default: richie_rev3 with Ethernet/lwIP and DoIP)
+build_project("panda_h7", base_project_h7, "./board/main.c", ['-DRICHIE', '-DRICHIE_REV3', '-DHAS_DOIP'])
 
 # panda fw rev2 (legacy, uncomment if needed)
 # build_project("panda_h7_rev2", base_project_h7, "./board/main.c", ['-DRICHIE', '-DRICHIE_REV2'])
