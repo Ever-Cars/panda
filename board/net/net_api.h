@@ -1,6 +1,6 @@
 #pragma once
 
-// Boundary between panda (unity build, MISRA) and the lwIP side (separately
+// Boundary between panda (unity build) and the lwIP side (separately
 // compiled objects). Only plain C types cross this line: panda never sees
 // lwIP types and lwIP never touches Ethernet hardware.
 
@@ -13,14 +13,17 @@
 
 // ***** Implemented by panda (board/drivers/eth.h) *****
 
+// Reset and configure the PHY and MAC. Busy-waits ~40 ms for PHY power-up.
+void eth_init(void);
+
+// Link supervision, init retries and DMA error recovery. Main loop only.
+void eth_service(void);
+
 // True while the PHY reports link and the MAC/DMA are running.
 bool eth_link_is_up(void);
 
 // MAC address derived from the MCU unique ID (locally administered, unicast).
 void eth_get_mac(uint8_t mac[ETH_MAC_LEN]);
-
-// Panda serial (MCU unique ID as ETH_SERIAL_LEN hex characters) plus a NUL.
-void eth_get_serial(char serial[ETH_SERIAL_LEN + 1U]);
 
 // Received frame without FCS, or NULL when none is pending. The frame stays
 // valid until eth_rx_frame_release(), which must be called for every frame.
@@ -32,16 +35,19 @@ void eth_rx_frame_release(void);
 uint8_t *eth_tx_buffer_get(void);
 bool eth_tx_frame_send(uint16_t len);
 
-// Wrap-safe millisecond clock derived from the microsecond timer.
-uint32_t eth_millis(void);
+// ***** Implemented by panda (board/net/net_platform.h) *****
 
-// Entropy for the network stack's PRNG (unique ID mixed with timer).
-uint32_t eth_random_seed(void);
+// lwIP's millisecond clock, derived from the microsecond timer.
+uint32_t sys_now(void);
+
+// Panda serial (MCU unique ID as ETH_SERIAL_LEN hex characters) plus a NUL.
+void net_get_serial(char serial[ETH_SERIAL_LEN + 1U]);
 
 // ***** Implemented by the lwIP side (board/net/net.c) *****
 
-// Bring up lwIP, the network interface, DHCP/AutoIP and IPv6 SLAAC.
+// Bring up Ethernet, lwIP, the network interface, DHCP/AutoIP and IPv6 SLAAC.
 void net_init(void);
 
-// Process received frames, link changes and lwIP timers. Main loop only.
+// Service Ethernet, then process received frames, link changes and lwIP
+// timers. Main loop only.
 void net_poll(void);

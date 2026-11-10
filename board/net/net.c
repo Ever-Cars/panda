@@ -30,7 +30,7 @@ static bool net_link_up;
 static uint32_t net_rand_state;
 
 uint32_t net_rand(void) {
-  // xorshift32, seeded from the unique ID and timer in net_init()
+  // xorshift32, seeded in net_init()
   uint32_t x = net_rand_state;
   x ^= x << 13;
   x ^= x >> 17;
@@ -48,10 +48,6 @@ void net_platform_assert(const char *msg, int line, const char *file) {
   print("lwIP assert at "); print(file); print(":0x"); puth((unsigned int)line); print("\n");
   assert_fatal(false, msg);
   while (true) {}  // assert_fatal(false, ...) hangs; this makes noreturn provable
-}
-
-u32_t sys_now(void) {
-  return eth_millis();
 }
 
 static err_t net_linkoutput(struct netif *netif, struct pbuf *p) {
@@ -75,7 +71,7 @@ static err_t net_netif_init(struct netif *netif) {
   netif->name[1] = 'n';
 
   // DHCP hostname: "panda-" + the panda serial, as on USB and in bifrost's panda_id
-  eth_get_serial(&net_hostname[NET_HOSTNAME_PREFIX_LEN]);
+  net_get_serial(&net_hostname[NET_HOSTNAME_PREFIX_LEN]);
   netif->hostname = net_hostname;
 
   netif->mtu = 1500;
@@ -107,7 +103,13 @@ static void net_status_callback(struct netif *netif, netif_nsc_reason_t reason, 
 }
 
 void net_init(void) {
-  net_rand_state = eth_random_seed() | 1U;  // xorshift state must be nonzero
+  eth_init();
+
+  // The MAC differs per board; the clock adds a little per boot
+  uint8_t mac[ETH_MAC_LEN];
+  eth_get_mac(mac);
+  uint32_t seed = ((uint32_t)mac[2] << 24) | ((uint32_t)mac[3] << 16) | ((uint32_t)mac[4] << 8) | mac[5];
+  net_rand_state = (seed ^ sys_now()) | 1U;  // xorshift state must be nonzero
   lwip_init();
 
   (void)netif_add(&net_netif, IP4_ADDR_ANY4, IP4_ADDR_ANY4, IP4_ADDR_ANY4, NULL, net_netif_init, ethernet_input);
@@ -127,6 +129,8 @@ void net_init(void) {
 }
 
 void net_poll(void) {
+  eth_service();
+
   bool link_up = eth_link_is_up();
   if (link_up != net_link_up) {
     net_link_up = link_up;

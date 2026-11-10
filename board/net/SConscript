@@ -1,9 +1,9 @@
 Import('env')
 
 # lwIP (third party, git submodule) and its glue are compiled as separate
-# objects and linked into the panda image. They never enter the panda unity
-# build, so lwIP is not subject to panda's MISRA checks; the hardware driver
-# and everything panda calls live in board/drivers/eth.h and board/stm32h7/lleth.h.
+# objects and linked into the panda image; they never enter the panda unity
+# build. Everything the glue calls in panda (see net_api.h) is in
+# board/drivers/eth.h and net_platform.h.
 
 LWIP = 'lwip/src'
 include_dirs = [Dir('.'), Dir(f'{LWIP}/include')]

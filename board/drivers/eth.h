@@ -202,29 +202,14 @@ void eth_rx_wake_arm(void) {
 
 // ***** net_api.h *****
 
-// cppcheck-suppress misra-c2012-8.7 ; called from the separately compiled lwIP glue (board/net)
 bool eth_link_is_up(void) {
   return eth_state.link_up;
 }
 
-// cppcheck-suppress misra-c2012-8.7 ; called from the separately compiled lwIP glue (board/net)
 void eth_get_mac(uint8_t mac[ETH_MAC_LEN]) {
   (void)memcpy(mac, eth_mac, ETH_MAC_LEN);
 }
 
-// cppcheck-suppress misra-c2012-8.7 ; called from the separately compiled lwIP glue (board/net)
-void eth_get_serial(char serial[ETH_SERIAL_LEN + 1U]) {
-  static const char hex[] = "0123456789abcdef";
-  const uint8_t *uid = (const uint8_t *)UID_BASE;
-  for (uint32_t i = 0U; i < (ETH_SERIAL_LEN / 2U); i++) {
-    serial[2U * i] = hex[uid[i] >> 4];
-    serial[(2U * i) + 1U] = hex[uid[i] & 0xFU];
-  }
-
-  serial[ETH_SERIAL_LEN] = '\0';
-}
-
-// cppcheck-suppress misra-c2012-8.7 ; called from the separately compiled lwIP glue (board/net)
 const uint8_t *eth_rx_frame_get(uint16_t *len) {
   const uint8_t *frame = NULL;
   if (eth_state.link_up) {
@@ -236,12 +221,10 @@ const uint8_t *eth_rx_frame_get(uint16_t *len) {
   return frame;
 }
 
-// cppcheck-suppress misra-c2012-8.7 ; called from the separately compiled lwIP glue (board/net)
 void eth_rx_frame_release(void) {
   lleth_rx_frame_release();
 }
 
-// cppcheck-suppress misra-c2012-8.7 ; called from the separately compiled lwIP glue (board/net)
 uint8_t *eth_tx_buffer_get(void) {
   uint8_t *buf = NULL;
   if (eth_state.link_up) {
@@ -257,7 +240,6 @@ uint8_t *eth_tx_buffer_get(void) {
   return buf;
 }
 
-// cppcheck-suppress misra-c2012-8.7 ; called from the separately compiled lwIP glue (board/net)
 bool eth_tx_frame_send(uint16_t len) {
   bool ret = false;
   if (eth_state.link_up && (len <= ETH_FRAME_MAX_LEN) && (lleth_tx_buffer_get() != NULL)) {
@@ -266,20 +248,4 @@ bool eth_tx_frame_send(uint16_t len) {
     ret = true;
   }
   return ret;
-}
-
-// cppcheck-suppress misra-c2012-8.7 ; called from the separately compiled lwIP glue (board/net)
-uint32_t eth_millis(void) {
-  static uint32_t eth_clock_ms = 0U;
-
-  // Unsigned arithmetic handles timer wrap; sub-ms time carries forward.
-  // Requires calls <71 min apart (normal lwIP polling) and no timer reset.
-  eth_clock_ms += (microsecond_timer_get() - (eth_clock_ms * 1000U)) / 1000U;
-  return eth_clock_ms;
-}
-
-// cppcheck-suppress misra-c2012-8.7 ; called from the separately compiled lwIP glue (board/net)
-uint32_t eth_random_seed(void) {
-  const uint32_t *uid = (const uint32_t *)UID_BASE;
-  return uid[0] ^ uid[1] ^ uid[2] ^ microsecond_timer_get();
 }

@@ -28,6 +28,7 @@
 
 #ifdef HAS_DOIP
   #include "board/drivers/eth.h"
+  #include "board/net/net_platform.h"
 #endif
 
 #ifdef RICHIE
@@ -287,7 +288,6 @@ static void tick_handler(void) {
 // and interrupts (CAN, safety) always preempt it.
 static void net_service(void) {
 #ifdef HAS_DOIP
-  eth_service();
   net_poll();
 #endif
 }
@@ -362,8 +362,7 @@ int main(void) {
 #endif
 
 #ifdef HAS_DOIP
-  // Before usb_init(): eth_init() busy-waits ~40 ms for the PHY
-  eth_init();
+  // Before usb_init(): busy-waits ~40 ms for the PHY
   net_init();
 #endif
 
