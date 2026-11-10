@@ -18,6 +18,11 @@ IGNORED_PATHS = (
   'board/stm32h7/inc',
   'board/fake_stm.h',
 
+  # Ethernet (HAS_DOIP) is outside the MISRA-checked build configuration.
+  'board/net/',
+  'board/drivers/eth.h',
+  'board/stm32h7/lleth.h',
+
   # bootstub only files
   'board/flasher.h',
   'board/bootstub.c',
