@@ -24,10 +24,10 @@
 
 #define ETH_PHY_POWER_UP_US 40000U  // 25 ms after supplies are up + load switch turn-on + margin
 #define ETH_PHY_RESET_US 200U  // nRST low time: 100 us minimum
-#define ETH_PHY_READY_US 50000U  // reset release to MAC reset
+#define ETH_PHY_READY_US 100U  // reset release to MAC reset: measured ready in ~20 us
 
 #define ETH_LINK_POLL_US 100000U
-#define ETH_RESET_RETRY_US 1000000U  // each eth_reset() busy-waits ~50 ms (PHY) + up to 10 ms (MAC)
+#define ETH_RESET_RETRY_US 1000000U  // each eth_reset() busy-waits ~0.3 ms (PHY) + up to 10 ms (MAC)
 #define ETH_TX_WAIT_US 500U  // ~4 full-size frames at 100 Mbit/s
 
 // Counters, readable over SWD without halting the core

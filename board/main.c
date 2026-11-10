@@ -362,7 +362,7 @@ int main(void) {
 #endif
 
 #ifdef HAS_DOIP
-  // Before usb_init(): eth_init() busy-waits ~90 ms for the PHY
+  // Before usb_init(): eth_init() busy-waits ~40 ms for the PHY
   eth_init();
   net_init();
 #endif
