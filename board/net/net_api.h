@@ -20,10 +20,10 @@ void eth_init(void);
 void eth_service(void);
 
 // True while the PHY reports link and the MAC/DMA are running.
-bool eth_link_is_up(void);
+bool eth_is_link_up(void);
 
 // MAC address derived from the MCU unique ID (locally administered, unicast).
-void eth_get_mac(uint8_t mac[ETH_MAC_LEN]);
+void eth_copy_mac(uint8_t mac[ETH_MAC_LEN]);
 
 // Received frame without FCS, or NULL when none is pending. The frame stays
 // valid until eth_rx_frame_release(), which must be called for every frame.

@@ -22,7 +22,7 @@ extern void assert_fatal(bool condition, const char *msg);
 #define NET_HOSTNAME_PREFIX_LEN 6U  // "panda-"
 
 // Frames dropped because the lwIP heap was full, readable over SWD
-uint32_t net_rx_no_mem;
+static uint32_t net_rx_no_mem;
 
 static struct netif net_netif;
 static char net_hostname[NET_HOSTNAME_PREFIX_LEN + ETH_SERIAL_LEN + 1U] = "panda-";
@@ -53,6 +53,7 @@ void net_platform_assert(const char *msg, int line, const char *file) {
 static err_t net_linkoutput(struct netif *netif, struct pbuf *p) {
   (void)netif;
   err_t err = ERR_BUF;
+
   if (p->tot_len <= ETH_FRAME_MAX_LEN) {
     uint8_t *buf = eth_tx_buffer_get();  // counts ring-full in eth_state
     if (buf == NULL) {
@@ -77,7 +78,7 @@ static err_t net_netif_init(struct netif *netif) {
   netif->mtu = 1500;
   netif->mtu6 = 1500;
   netif->hwaddr_len = ETH_MAC_LEN;
-  eth_get_mac(netif->hwaddr);
+  eth_copy_mac(netif->hwaddr);
 
   netif->flags = NETIF_FLAG_BROADCAST | NETIF_FLAG_ETHARP | NETIF_FLAG_ETHERNET | NETIF_FLAG_MLD6;
   netif->output = etharp_output;
@@ -103,12 +104,14 @@ static void net_status_callback(struct netif *netif, netif_nsc_reason_t reason, 
 }
 
 void net_init(void) {
-  eth_init();
-
   // The MAC differs per board; the clock adds a little per boot
   uint8_t mac[ETH_MAC_LEN];
-  eth_get_mac(mac);
-  uint32_t seed = ((uint32_t)mac[2] << 24) | ((uint32_t)mac[3] << 16) | ((uint32_t)mac[4] << 8) | mac[5];
+  uint32_t seed = 0;
+
+  eth_init();
+
+  eth_copy_mac(mac);
+  seed = ((uint32_t)mac[2] << 24) | ((uint32_t)mac[3] << 16) | ((uint32_t)mac[4] << 8) | mac[5];
   net_rand_state = (seed ^ sys_now()) | 1U;  // xorshift state must be nonzero
   lwip_init();
 
@@ -131,7 +134,7 @@ void net_init(void) {
 void net_poll(void) {
   eth_service();
 
-  bool link_up = eth_link_is_up();
+  bool link_up = eth_is_link_up();
   if (link_up != net_link_up) {
     net_link_up = link_up;
     if (link_up) {
@@ -148,7 +151,7 @@ void net_poll(void) {
       break;
     }
 
-    // Received frames share the lwIP heap with transmit data (no pbuf pool)
+    // Received frames share the lwIP heap with transmit data
     struct pbuf *p = pbuf_alloc(PBUF_RAW, len, PBUF_RAM);
     if (p != NULL) {
       (void)pbuf_take(p, frame, len);

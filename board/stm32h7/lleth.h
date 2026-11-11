@@ -7,7 +7,7 @@
 
 #define LLETH_RX_DESC_CNT 4U
 #define LLETH_TX_DESC_CNT 3U  // one slot always stays free, see lleth_tx_buffer_get()
-#define LLETH_BUF_SIZE 1536U  // multiple of 4, fits a 1522 byte frame
+#define LLETH_BUF_SIZE    1536U  // multiple of 4, fits a 1522 byte frame
 
 // MACCR bits this driver controls; the rest (incl. read-only bit 15) are left alone
 #define LLETH_MACCR_MASK (ETH_MACCR_ACS | ETH_MACCR_CST | ETH_MACCR_FES | ETH_MACCR_DM | ETH_MACCR_TE | ETH_MACCR_RE)
@@ -16,16 +16,16 @@
 #define LLETH_TIMEOUT_US 10000U
 
 // Descriptor bits (RM0468 "Ethernet DMA descriptors")
-#define LLETH_DES3_OWN (1UL << 31)
-#define LLETH_DES3_CTXT (1UL << 30)
-#define LLETH_DES3_FD (1UL << 29)
-#define LLETH_DES3_LD (1UL << 28)
-#define LLETH_RDES3_IOC (1UL << 30)  // read format: raise RI when this buffer completes
-#define LLETH_RDES3_BUF1V (1UL << 24)
-#define LLETH_RDES3_ES (1UL << 15)
-#define LLETH_RDES3_PL_MASK 0x7FFFU
-#define LLETH_TDES3_CIC_FULL (3UL << 16)  // insert IP header and payload checksums
-#define LLETH_TDES2_B1L_MASK 0x3FFFU
+#define LLETH_DES3_OWN        (1UL << 31)
+#define LLETH_DES3_CTXT       (1UL << 30)
+#define LLETH_DES3_FD         (1UL << 29)
+#define LLETH_DES3_LD         (1UL << 28)
+#define LLETH_RDES3_IOC       (1UL << 30)  // read format: raise RI when this buffer completes
+#define LLETH_RDES3_BUF1V     (1UL << 24)
+#define LLETH_RDES3_ES        (1UL << 15)
+#define LLETH_RDES3_PL_MASK   0x7FFFU
+#define LLETH_TDES3_CIC_FULL  (3UL << 16)  // insert IP header and payload checksums
+#define LLETH_TDES2_B1L_MASK  0x3FFFU
 
 #define LLETH_MDIO_GOC_READ (3UL << 2)  // MACMDIOAR GOC field
 
@@ -52,7 +52,7 @@ static bool lleth_wait_clear(volatile const uint32_t *reg, uint32_t mask) {
   return (*reg & mask) == 0U;
 }
 
-static uint32_t lleth_desc_addr(const volatile lleth_desc_t *desc) {
+static inline uint32_t lleth_desc_addr(const volatile lleth_desc_t *desc) {
   return (uint32_t)desc;
 }
 
@@ -189,7 +189,7 @@ bool lleth_stop(void) {
   return ok;
 }
 
-// Returns the DMA channel status and clears it (write-1-to-clear).
+// Returns the DMA channel status and clears it (write-to-clear).
 uint32_t lleth_dma_status(void) {
   uint32_t status = ETH->DMACSR;
   ETH->DMACSR = status;
@@ -198,14 +198,14 @@ uint32_t lleth_dma_status(void) {
 
 bool lleth_mdio_read(uint32_t phy, uint32_t phy_reg, uint16_t *value) {
   bool ret = lleth_wait_clear(&(ETH->MACMDIOAR), ETH_MACMDIOAR_MB);
+
   if (ret) {
     ETH->MACMDIOAR = (phy << ETH_MACMDIOAR_PA_Pos) | (phy_reg << ETH_MACMDIOAR_RDA_Pos) |
                      ETH_MACMDIOAR_CR_DIV62 | LLETH_MDIO_GOC_READ | ETH_MACMDIOAR_MB;
     ret = lleth_wait_clear(&(ETH->MACMDIOAR), ETH_MACMDIOAR_MB);
-  }
-
-  if (ret) {
-    *value = (uint16_t)(ETH->MACMDIODR & 0xFFFFU);
+    if (ret) {
+      *value = (uint16_t)(ETH->MACMDIODR & 0xFFFFU);
+    }
   }
 
   return ret;
@@ -225,8 +225,10 @@ void lleth_rx_frame_release(void) {
 const uint8_t *lleth_rx_frame_get(uint16_t *len, uint32_t *dropped) {
   const uint8_t *frame = NULL;
   bool done = false;
+
   for (uint32_t i = 0U; (i < LLETH_RX_DESC_CNT) && !done; i++) {
     uint32_t des3 = lleth_rx_desc[lleth_rx_idx].des3;
+
     if ((des3 & LLETH_DES3_OWN) != 0U) {
       done = true;  // still owned by the DMA: nothing (more) received
     } else {
@@ -234,6 +236,7 @@ const uint8_t *lleth_rx_frame_get(uint16_t *len, uint32_t *dropped) {
       bool ok = ((des3 & (LLETH_DES3_FD | LLETH_DES3_LD)) == (LLETH_DES3_FD | LLETH_DES3_LD)) &&
                 ((des3 & (LLETH_DES3_CTXT | LLETH_RDES3_ES)) == 0U);
       uint16_t length = (uint16_t)(des3 & LLETH_RDES3_PL_MASK);
+
       if (ok && (length > 0U) && (length <= LLETH_BUF_SIZE)) {
         *len = length;
         frame = &lleth_rx_buf[lleth_rx_idx][0];
@@ -254,6 +257,7 @@ const uint8_t *lleth_rx_frame_get(uint16_t *len, uint32_t *dropped) {
 uint8_t *lleth_tx_buffer_get(void) {
   uint8_t *buf = NULL;
   uint32_t next = (lleth_tx_idx + 1U) % LLETH_TX_DESC_CNT;
+
   if (((lleth_tx_desc[lleth_tx_idx].des3 & LLETH_DES3_OWN) == 0U) &&
       ((lleth_tx_desc[next].des3 & LLETH_DES3_OWN) == 0U)) {
     buf = &lleth_tx_buf[lleth_tx_idx][0];
@@ -265,6 +269,7 @@ uint8_t *lleth_tx_buffer_get(void) {
 // frames, appends the FCS and inserts IPv4/TCP/UDP/ICMP checksums.
 void lleth_tx_frame_send(uint16_t len) {
   lleth_desc_t *desc = &lleth_tx_desc[lleth_tx_idx];
+
   desc->des0 = (uint32_t)&lleth_tx_buf[lleth_tx_idx][0];
   desc->des1 = 0U;
   desc->des2 = (uint32_t)len & LLETH_TDES2_B1L_MASK;

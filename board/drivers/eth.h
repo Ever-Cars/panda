@@ -111,25 +111,26 @@ static bool eth_phy_read(uint32_t phy_reg, uint16_t *value) {
 }
 
 static void eth_link_poll(void) {
-  uint16_t bmsr = 0U;
+  uint16_t value = 0U;
   // Link status is latched low: the first read only clears drops since the
   // last poll, the second reports the current state
-  (void)eth_phy_read(ETH_PHY_BMSR, &bmsr);
-  bool ok = eth_phy_read(ETH_PHY_BMSR, &bmsr);
+  (void)eth_phy_read(ETH_PHY_BMSR, &value);
+  bool ok = eth_phy_read(ETH_PHY_BMSR, &value);
   if (!ok) {
     eth_state.phy_errors++;
   }
 
-  bool link = ok && ((bmsr & ETH_PHY_BMSR_LINK) != 0U);
+  bool link = ok && ((value & ETH_PHY_BMSR_LINK) != 0U);
 
   if (link && !eth_state.link_up) {
-    uint16_t scsr = 0U;
-    if (eth_phy_read(ETH_PHY_SCSR, &scsr) && ((scsr & ETH_PHY_SCSR_AUTODONE) != 0U)) {
-      eth_state.speed_100m = (scsr & ETH_PHY_SCSR_100M) != 0U;
-      eth_state.full_duplex = (scsr & ETH_PHY_SCSR_FULL_DUPLEX) != 0U;
+    value = 0U;
+    if (eth_phy_read(ETH_PHY_SCSR, &value) && ((value & ETH_PHY_SCSR_AUTODONE) != 0U)) {
+      eth_state.speed_100m = (value & ETH_PHY_SCSR_100M) != 0U;
+      eth_state.full_duplex = (value & ETH_PHY_SCSR_FULL_DUPLEX) != 0U;
       lleth_start(eth_state.speed_100m, eth_state.full_duplex);
       eth_state.link_up = true;
       eth_state.link_changes++;
+
       print("ETH link up, "); print(eth_state.speed_100m ? "100" : "10");
       print(eth_state.full_duplex ? " Mbit full duplex\n" : " Mbit half duplex\n");
     }
@@ -151,31 +152,30 @@ void eth_init(void) {
   eth_reset();
 
   if (eth_state.initialized) {
-    bool ok = eth_phy_read(ETH_PHY_ID1, &eth_state.phy_id1);
-    ok = ok && eth_phy_read(ETH_PHY_ID2, &eth_state.phy_id2);
-    if (!ok) {
+    if (!eth_phy_read(ETH_PHY_ID1, &eth_state.phy_id1) ||
+        !eth_phy_read(ETH_PHY_ID2, &eth_state.phy_id2)) {
       eth_state.phy_errors++;
     }
 
     print("ETH init, PHY ID 0x"); puth(((uint32_t)eth_state.phy_id1 << 16) | eth_state.phy_id2); print("\n");
   } else {
-    print("ETH init failed: MAC reset timed out (no RMII reference clock?), retrying\n");
+    print("ETH init failed: MAC reset timed out, retrying\n");
   }
 }
 
 // Link supervision, MAC init retries and DMA error recovery. Main loop only.
 void eth_service(void) {
+  static uint32_t eth_reset_last_us = 0U;
+  static uint32_t eth_link_poll_last_us = 0U;
+  uint32_t now = microsecond_timer_get();
+
   if (!eth_state.initialized) {
     // Retry at a limited rate; link-up is only possible once a reset succeeds
-    static uint32_t eth_reset_last_us = 0U;
-    uint32_t now = microsecond_timer_get();
     if (get_ts_elapsed(now, eth_reset_last_us) >= ETH_RESET_RETRY_US) {
       eth_reset_last_us = now;
       eth_reset();
     }
   } else {
-    static uint32_t eth_link_poll_last_us = 0U;
-    uint32_t now = microsecond_timer_get();
     if (get_ts_elapsed(now, eth_link_poll_last_us) >= ETH_LINK_POLL_US) {
       eth_link_poll_last_us = now;
       eth_link_poll();
@@ -202,16 +202,17 @@ void eth_rx_wake_arm(void) {
 
 // ***** net_api.h *****
 
-bool eth_link_is_up(void) {
+bool eth_is_link_up(void) {
   return eth_state.link_up;
 }
 
-void eth_get_mac(uint8_t mac[ETH_MAC_LEN]) {
+void eth_copy_mac(uint8_t mac[ETH_MAC_LEN]) {
   (void)memcpy(mac, eth_mac, ETH_MAC_LEN);
 }
 
 const uint8_t *eth_rx_frame_get(uint16_t *len) {
   const uint8_t *frame = NULL;
+
   if (eth_state.link_up) {
     frame = lleth_rx_frame_get(len, &eth_state.rx_dropped);
     if (frame != NULL) {
@@ -227,8 +228,9 @@ void eth_rx_frame_release(void) {
 
 uint8_t *eth_tx_buffer_get(void) {
   uint8_t *buf = NULL;
+  uint32_t start = microsecond_timer_get();
+
   if (eth_state.link_up) {
-    uint32_t start = microsecond_timer_get();
     do {
       buf = lleth_tx_buffer_get();
     } while ((buf == NULL) && (get_ts_elapsed(microsecond_timer_get(), start) < ETH_TX_WAIT_US));
@@ -242,6 +244,7 @@ uint8_t *eth_tx_buffer_get(void) {
 
 bool eth_tx_frame_send(uint16_t len) {
   bool ret = false;
+
   if (eth_state.link_up && (len <= ETH_FRAME_MAX_LEN) && (lleth_tx_buffer_get() != NULL)) {
     lleth_tx_frame_send(len);
     eth_state.tx_frames++;
