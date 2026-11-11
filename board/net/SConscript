@@ -29,6 +29,6 @@ lwip_sources = [f'core/{f}' for f in (
 ]
 
 objs = [lwip_env.Object(f'{LWIP}/{s}') for s in lwip_sources]
-objs += [glue_env.Object(s) for s in ('net.c', 'net_echo.c', 'net_libc.c')]
+objs += [glue_env.Object(s) for s in ('net.c', 'doip.c', 'net_echo.c', 'net_libc.c')]
 
 Return('objs')

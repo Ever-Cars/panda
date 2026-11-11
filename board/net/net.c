@@ -1,17 +1,18 @@
-// lwIP integration: network interface on top of net_api.h, DHCP/AutoIP and
+// lwIP integration: network interface on top of net_api.h, AutoIP/APIPA and
 // IPv6 SLAAC, polled from the panda main loop.
 
 #include "lwip/init.h"
 #include "lwip/netif.h"
 #include "lwip/pbuf.h"
 #include "lwip/timeouts.h"
-#include "lwip/dhcp.h"
+#include "lwip/autoip.h"
 #include "lwip/etharp.h"
 #include "lwip/ethip6.h"
 #include "netif/ethernet.h"
 
 #include "net_api.h"
 #include "net_echo.h"
+#include "doip.h"
 
 // panda, board/drivers/uart.h and board/libc.h
 extern void print(const char *a);
@@ -90,7 +91,7 @@ static err_t net_netif_init(struct netif *netif) {
 static void net_status_callback(struct netif *netif, netif_nsc_reason_t reason, const netif_ext_callback_args_t *args) {
   if ((reason & LWIP_NSC_IPV4_ADDRESS_CHANGED) != 0U) {
     char buf[IP4ADDR_STRLEN_MAX];
-    print(dhcp_supplied_address(netif) ? "NET IPv4 (DHCP): " : "NET IPv4: ");
+    print("NET IPv4: ");
     print(ip4addr_ntoa_r(netif_ip4_addr(netif), buf, (int)sizeof(buf))); print("\n");
   }
 
@@ -121,12 +122,12 @@ void net_init(void) {
   NETIF_DECLARE_EXT_CALLBACK(net_ext_callback);
   netif_add_ext_callback(&net_ext_callback, net_status_callback);
 
+  // One dual-stack interface: IPv6 address detection and IPv4 AutoIP probing
+  // run concurrently. Neither address family waits for the other to finish.
   netif_create_ip6_linklocal_address(&net_netif, 1);
   net_netif.ip6_autoconfig_enabled = 1;  // the setter macro null-checks a static address (-Waddress)
 
-  // Administratively up; DHCP, AutoIP and SLAAC follow the link state
   netif_set_up(&net_netif);
-  (void)dhcp_start(&net_netif);
 
   net_echo_init();
 }
@@ -139,6 +140,10 @@ void net_poll(void) {
     net_link_up = link_up;
     if (link_up) {
       netif_set_link_up(&net_netif);
+      // Probe APIPA as soon as Ethernet is live, without waiting for DHCP.
+      // Starting earlier would run conflict detection while no frames can be
+      // sent. lwIP re-probes the same address on subsequent link connections.
+      assert_fatal(autoip_start(&net_netif) == ERR_OK, "NET AutoIP start failed\n");
     } else {
       netif_set_link_down(&net_netif);
     }
@@ -166,4 +171,5 @@ void net_poll(void) {
   }
 
   sys_check_timeouts();
+  doip_transport_poll();
 }
