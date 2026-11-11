@@ -1,0 +1,34 @@
+Import('env')
+
+# lwIP (third party, git submodule) and its glue are compiled as separate
+# objects and linked into the panda image; they never enter the panda unity
+# build. Everything the glue calls in panda (see net_api.h) is in
+# board/drivers/eth.h and net_platform.h.
+
+LWIP = 'lwip/src'
+include_dirs = [Dir('.'), Dir(f'{LWIP}/include')]
+
+# Upstream lwIP: keep ABI/codegen flags, relax panda's warning strictness
+lwip_env = env.Clone()
+lwip_env['CFLAGS'] = [f for f in env['CFLAGS'] if f not in ('-Werror', '-Wextra', '-Wstrict-prototypes', '-fmax-errors=1')]
+lwip_env.Prepend(CPPPATH=include_dirs)
+
+# Our glue code keeps the full panda warning set
+glue_env = env.Clone()
+glue_env.Prepend(CPPPATH=include_dirs)
+
+lwip_sources = [f'core/{f}' for f in (
+  'def.c', 'inet_chksum.c', 'init.c', 'ip.c', 'mem.c', 'memp.c', 'netif.c',
+  'pbuf.c', 'tcp.c', 'tcp_in.c', 'tcp_out.c', 'timeouts.c', 'udp.c',
+)] + [f'core/ipv4/{f}' for f in (
+  'acd.c', 'autoip.c', 'dhcp.c', 'etharp.c', 'icmp.c', 'ip4.c', 'ip4_addr.c',
+)] + [f'core/ipv6/{f}' for f in (
+  'ethip6.c', 'icmp6.c', 'inet6.c', 'ip6.c', 'ip6_addr.c', 'mld6.c', 'nd6.c',
+)] + [
+  'netif/ethernet.c',
+]
+
+objs = [lwip_env.Object(f'{LWIP}/{s}') for s in lwip_sources]
+objs += [glue_env.Object(s) for s in ('net.c', 'net_echo.c', 'net_libc.c')]
+
+Return('objs')

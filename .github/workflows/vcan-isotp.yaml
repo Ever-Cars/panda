@@ -18,6 +18,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: true  # lwIP, built into panda_h7
 
       - name: Install SocketCAN dependencies
         run: |

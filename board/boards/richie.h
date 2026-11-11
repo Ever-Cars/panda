@@ -33,8 +33,48 @@ static uint32_t richie_read_voltage_mV(void) {
   return (adc_get_mV(&(const adc_signal_t) ADC_CHANNEL_DEFAULT(ADC1, 3)) * 61U) / 11U;
 }
 
+#ifdef HAS_DOIP
+static void richie_init_eth_pin(GPIO_TypeDef *GPIO, unsigned int pin) {
+  set_gpio_pullup(GPIO, pin, PULL_NONE);
+  set_gpio_alternate(GPIO, pin, GPIO_AF11_ETH);
+  register_set_bits(&(GPIO->OSPEEDR), 3UL << (pin * 2U));  // very high speed
+}
+
+static void richie_init_ethernet(void) {
+  // LAN8742A RMII: REF_CLK A1, MDIO A2, CRS_DV A7, MDC C1, RXD0 C4, RXD1 C5,
+  // RX_ER B10, TX_EN B11, TXD0 G13, TXD1 G14
+  richie_init_eth_pin(GPIOA, 1);
+  richie_init_eth_pin(GPIOA, 2);
+  richie_init_eth_pin(GPIOA, 7);
+  richie_init_eth_pin(GPIOC, 1);
+  richie_init_eth_pin(GPIOC, 4);
+  richie_init_eth_pin(GPIOC, 5);
+  richie_init_eth_pin(GPIOB, 10);
+  richie_init_eth_pin(GPIOB, 11);
+  richie_init_eth_pin(GPIOG, 13);
+  richie_init_eth_pin(GPIOG, 14);
+
+  // E0: PHY reset, E5: PHY power enable. Reset is asserted before power comes
+  // up and held low until eth_init() releases it.
+  set_gpio_pullup(GPIOE, 0, PULL_NONE);
+  set_gpio_output(GPIOE, 0, false);
+  set_gpio_pullup(GPIOE, 5, PULL_NONE);
+  set_gpio_output(GPIOE, 5, true);
+
+  // A8: MCO1 = HSE (25 MHz) clocks the PHY crystal input
+  set_gpio_pullup(GPIOA, 8, PULL_NONE);
+  set_gpio_alternate(GPIOA, 8, GPIO_AF0_MCO);
+  register_set_bits(&(GPIOA->OSPEEDR), 3UL << (8U * 2U));
+  register_set(&(RCC->CFGR), RCC_CFGR_MCO1_1, RCC_CFGR_MCO1 | RCC_CFGR_MCO1PRE);
+}
+#endif
+
 static void richie_init(void) {
   common_init_gpio();
+
+#ifdef HAS_DOIP
+  richie_init_ethernet();
+#endif
 
   // B5: CAN1 transceiver standby
   set_gpio_pullup(GPIOB, 5, PULL_NONE);
