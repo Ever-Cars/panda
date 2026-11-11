@@ -424,17 +424,10 @@ int main(void) {
         enter_stop_mode(); // deep sleep, wakes on CAN or SBU activity
         assert_fatal(false, "Error: enter_stop_mode returned after system reset. Hanging\n");
       }
-
-      // Masked, so an interrupt between the check and WFI stays pending and
-      // wakes it instead of running first and leaving us asleep
-      ENTER_CRITICAL();
-      if (power_save_enabled) {
 #ifdef HAS_DOIP
         eth_rx_wake_arm();
 #endif
-        __WFI();
-      }
-      EXIT_CRITICAL();
+      __WFI();
       SCB->SCR &= ~SCB_SCR_SLEEPDEEP_Msk;
     }
   }
