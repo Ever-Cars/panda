@@ -290,7 +290,6 @@ static void tick_handler(void) {
 static void net_service(void) {
 #ifdef HAS_DOIP
   net_poll();
-  doip_transport_poll();
   doip_example_poll();
 #endif
 }

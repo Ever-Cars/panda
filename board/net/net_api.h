@@ -49,6 +49,6 @@ void net_get_serial(char serial[ETH_SERIAL_LEN + 1U]);
 // link-local/SLAAC.
 void net_init(void);
 
-// Service Ethernet, then process received frames, link changes and lwIP
-// timers. Main loop only.
+// Service Ethernet, then process received frames, link changes, lwIP timers
+// and the DoIP transport. Main loop only.
 void net_poll(void);

@@ -12,6 +12,7 @@
 
 #include "net_api.h"
 #include "net_echo.h"
+#include "doip.h"
 
 // panda, board/drivers/uart.h and board/libc.h
 extern void print(const char *a);
@@ -170,4 +171,5 @@ void net_poll(void) {
   }
 
   sys_check_timeouts();
+  doip_transport_poll();
 }

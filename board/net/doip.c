@@ -334,7 +334,7 @@ static void doip_handle_frame(uint16_t type, const uint8_t *payload, uint16_t le
       break;
     case DOIP_PAYLOAD_ALIVE_CHECK_REQUEST:
       doip_session.alive_pending = true;
-      doip_session.alive_started_ms = eth_millis();
+      doip_session.alive_started_ms = sys_now();
       break;
     default:
       // 7.DoIP-039/040: ignore unrelated messages, including header NACKs.
@@ -417,7 +417,7 @@ static err_t doip_tcp_connected(void *arg, struct tcp_pcb *pcb, err_t err) {
     return ERR_OK;
   }
   doip_session.state = DOIP_SEND_ACTIVATION;
-  doip_session.started_ms = eth_millis();
+  doip_session.started_ms = sys_now();
   return ERR_OK;
 }
 
@@ -443,7 +443,7 @@ bool doip_transport_connect(const doip_address_t *address, const doip_config_t *
   doip_session.config = *config;
   doip_session.ipv6 = address->ipv6;
   doip_session.state = DOIP_CONNECTING;
-  doip_session.started_ms = eth_millis();
+  doip_session.started_ms = sys_now();
   tcp_recv(doip_tcp, doip_tcp_recv);
   tcp_err(doip_tcp, doip_tcp_error);
   ip_addr_t remote;
@@ -488,7 +488,7 @@ bool doip_transport_send(const uint8_t *data, uint16_t len) {
   MEMCPY(doip_session.request, data, len);
   doip_session.request_len = len;
   doip_session.ack_pending = true;
-  doip_session.ack_started_ms = eth_millis();
+  doip_session.ack_started_ms = sys_now();
   return true;
 }
 
@@ -514,7 +514,7 @@ void doip_transport_poll(void) {
     return;
   }
 
-  uint32_t now = eth_millis();
+  uint32_t now = sys_now();
   switch (doip_session.state) {
     case DOIP_CONNECTING:
       if ((now - doip_session.started_ms) >= DOIP_TCP_CONNECT_TIMEOUT_MS) {

@@ -27,20 +27,18 @@ static doip_announcement_t doip_test_announcement;
 
 // Pump the network without recursively entering doip_example_poll().
 static void doip_test_service(void) {
-  eth_service();
   net_poll();
-  doip_transport_poll();
 }
 
 // Wait for a callback flag, or the whole interval when complete is NULL.
 // Discovery uses the full response window to collect announcements.
 static bool doip_test_wait(const bool *complete, uint32_t timeout_ms) {
-  uint32_t started = eth_millis();
-  while (eth_link_is_up() && (doip_test_error == NULL) &&
-         ((complete == NULL) || !*complete) && ((eth_millis() - started) < timeout_ms)) {
+  uint32_t started = sys_now();
+  while (eth_is_link_up() && (doip_test_error == NULL) &&
+         ((complete == NULL) || !*complete) && ((sys_now() - started) < timeout_ms)) {
     doip_test_service();
   }
-  return eth_link_is_up() && (doip_test_error == NULL) && ((complete == NULL) || *complete);
+  return eth_is_link_up() && (doip_test_error == NULL) && ((complete == NULL) || *complete);
 }
 
 // Print a VIN or serial number without assuming the bytes are null-terminated.
@@ -107,9 +105,9 @@ static bool doip_test_run(bool ipv6) {
   doip_test_response = false;
 
   print("DoIP "); print(ipv6 ? "IPv6" : "IPv4"); print(" waiting for address\n");
-  uint32_t started = eth_millis();
+  uint32_t started = sys_now();
   while (!doip_transport_ready(ipv6)) {
-    if (!eth_link_is_up() || ((eth_millis() - started) >= DOIP_TEST_ADDRESS_TIMEOUT_MS)) {
+    if (!eth_is_link_up() || ((sys_now() - started) >= DOIP_TEST_ADDRESS_TIMEOUT_MS)) {
       return doip_test_fail("address configuration timed out");
     }
     doip_test_service();
@@ -120,8 +118,8 @@ static bool doip_test_run(bool ipv6) {
 
   // Retry discovery/connection while the ECU boots. Each discovery still gets
   // the spec's full response window; transport protocol timers are independent.
-  started = eth_millis();
-  while ((eth_millis() - started) < DOIP_TEST_ECU_STARTUP_TIMEOUT_MS) {
+  started = sys_now();
+  while ((sys_now() - started) < DOIP_TEST_ECU_STARTUP_TIMEOUT_MS) {
     doip_test_error = NULL;
     doip_test_found = false;
     doip_test_discovering = true;
@@ -169,7 +167,7 @@ static bool doip_test_run(bool ipv6) {
 // Run once on each link-up. IPv6 runs even when the IPv4 test fails.
 static void doip_example_poll(void) {
   static bool link_was_up = false;
-  if (!eth_link_is_up()) {
+  if (!eth_is_link_up()) {
     link_was_up = false;
     return;
   }
